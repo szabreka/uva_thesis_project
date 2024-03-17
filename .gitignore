@@ -1,0 +1,3 @@
+#ignore data related changes
+data/*
+.DS_Store
