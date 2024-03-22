@@ -1,5 +1,5 @@
 """
-This script downloads all videos in the dataset. The script was created based on: https://github.com/MultiX-Amsterdam/ijmond-camera-monitor/blob/main/dataset/2024-01-22/download_videos.py
+This script downloads all videos in the dataset. The code was created based on: https://github.com/CMU-CREATE-Lab/deep-smoke-machine/blob/master/back-end/www/download_videos.py
 """
 
 import sys
@@ -57,7 +57,7 @@ def get_video_url(v):
     str
         The full URL of the video.
     """
-    camera_names = ["hoogovens", "kooksfabriek_1", "kooksfabriek_2"]
+    camera_names = ["clairton1", "braddock1", "westmifflin1"] 
     return v["url_root"] + camera_names[v["camera_id"]] + "/" +  v["url_part"] + "/" + v["file_name"] + ".mp4"
 
 
@@ -73,25 +73,33 @@ def main(argv):
     with open(json_file_path, "r") as json_file:
         data_dict = json.load(json_file)
 
-    # Start to download files
-    problem_videos = []
+# Download all videos in the metadata json file
+def main(argv):
+    json_file_path = "/Users/szaboreka/Documents/UvA/Thesis/uva_thesis_project/data/metadata_02242020.json"
+    download_path = "/Users/szaboreka/Documents/UvA/Thesis/uva_thesis_project/data/rise_videos/"
+    check_and_create_dir(download_path)
+    problem_video_ids = []
+    # Open the file and load its contents into a dictionary
+    with open(json_file_path, "r") as json_file:
+        data_dict = json.load(json_file)
+    
     for v in data_dict:
-        video_url = get_video_url(v)
-        file_name = v["file_name"]
-        file_path = download_path + file_name + ".mp4"
-        if not is_file_here(file_path):
-            print("Download video", file_name)
-            try:
-                urllib.request.urlretrieve(video_url, file_path)
-            except Exception:
-                print("\tError downloading video", file_name)
-                problem_videos.append(file_name)
-
-    # Print errors
-    if len(problem_videos) > 0:
+        # Do not download videos with bad data
+        if v["label_state"] == -2 or v["label_state_admin"] == -2:
+            continue
+        file_path = download_path + v["file_name"] + ".mp4"
+        if is_file_here(file_path): continue # skip if file exists
+        print("Download video", v["id"])
+        try:
+            urllib.request.urlretrieve(v["url_root"] + v["url_part"], file_path)
+        except:
+            print("\tError downloading video", v["id"])
+            problem_video_ids.append(v["id"])
+    print("Done download_videos.py")
+    if len(problem_video_ids) > 0:
         print("The following videos were not downloaded due to errors:")
-        for v in problem_videos:
-            print("\tv\n")
+        for i in problem_video_ids:
+            print("\ti\n")
     print("DONE")
 
 
