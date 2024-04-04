@@ -1,3 +1,6 @@
 #ignore data related changes
 data/*
 .DS_Store
+__pycache__/
+.idea/
+.ipynb_checkpoints/
