@@ -63,10 +63,10 @@ def get_video_url(v):
 
 def main(argv):
     # Specify the path to the JSON file
-    json_file_path = "/Users/szaboreka/Documents/UvA/Thesis/uva_thesis_project/data/metadata_ijmond_jan_22_2024.json"
+    json_file_path = "data/metadata_ijmond_jan_22_2024.json"
 
     # Specify the path that we want to store the videos and create it
-    download_path = "/Users/szaboreka/Documents/UvA/Thesis/uva_thesis_project/data/ijmond_videos/"
+    download_path = "data/ijmond_videos/"
     check_and_create_dir(download_path)
 
     # Open the file and load its contents into a dictionary

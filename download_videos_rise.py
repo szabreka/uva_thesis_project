@@ -61,7 +61,7 @@ def get_video_url(v):
     return v["url_root"] + camera_names[v["camera_id"]] + "/" +  v["url_part"] + "/" + v["file_name"] + ".mp4"
 
 
-def main(argv):
+'''def main(argv):
     # Specify the path to the JSON file
     json_file_path = "/Users/szaboreka/Documents/UvA/Thesis/uva_thesis_project/data/metadata_ijmond_jan_22_2024.json"
 
@@ -71,12 +71,12 @@ def main(argv):
 
     # Open the file and load its contents into a dictionary
     with open(json_file_path, "r") as json_file:
-        data_dict = json.load(json_file)
+        data_dict = json.load(json_file)'''
 
 # Download all videos in the metadata json file
 def main(argv):
-    json_file_path = "/Users/szaboreka/Documents/UvA/Thesis/uva_thesis_project/data/metadata_02242020.json"
-    download_path = "/Users/szaboreka/Documents/UvA/Thesis/uva_thesis_project/data/rise_videos/"
+    json_file_path = "data/metadata_02242020.json"
+    download_path = "data/rise_videos/"
     check_and_create_dir(download_path)
     problem_video_ids = []
     # Open the file and load its contents into a dictionary
