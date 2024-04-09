@@ -10,3 +10,38 @@ Yen-Chia Hsu, Ting-Hao (Kenneth) Huang, Ting-Yao Hu, Paul Dille, Sean Prendi, Ry
 - IJmond-video-dataset-2024-01-22: https://github.com/MultiX-Amsterdam/ijmond-camera-monitor/tree/main/dataset/2024-01-22#ijmond-video-dataset-2024-01-22
 - RISE-Dataset-2020-02-24: https://github.com/CMU-CREATE-Lab/deep-smoke-machine/tree/master/back-end/data/dataset/2020-02-24
 
+
+### Used splits on the merged dataset
+
+| View | S<sub>0</sub> | S<sub>1</sub> | S<sub>2</sub> | S<sub>4</sub> | S<sub>5</sub> |
+| --- | --- | --- | --- | --- | --- |
+| 0-0 | Train | Train | Test | Train | Train |
+| 0-1 | Test | Train | Train | Train | Train |
+| 0-2 | Train | Test | Train | Train | Train |
+| 0-3 | Train | Train | Validate | Train | Test |
+| 0-4 | Validate | Train | Train | Test | Validate |
+| 0-5 | Train | Validate | Train | Train | Test |
+| 0-6 | Train | Train | Test | Train | Validate |
+| 0-7 | Test | Train | Train | Validate | Train |
+| 0-8 | Train | Train | Validate | Test | Train |
+| 0-9 | Train | Test | Train | Validate | Train |
+| 0-10 | Validate | Train | Train | Test | Train |
+| 0-11 | Train | Validate | Train | Train | Test |
+| 0-12 | Train | Train | Test | Train | Train |
+| 0-13 | Test | Train | Train | Train | Train |
+| 0-14 | Train | Test | Train | Train | Train |
+| 1-0 | Test | Test | Test | Test | Test |
+| 2-0 | Test | Test | Test | Test | Test |
+| 2-1 | Test | Test | Test | Test | Test |
+| 2-2 | Test | Test | Test | Test | Test |
+| 3-0 | Test | Test | Test | Test | Test |
+| 3-1 | Test | Test | Test | Test | Test |
+| 3-2 | Validate | Train | Test | Train | Train |
+| 3-3 | Train | Train | Test | Train | Validate |
+| 3-4 | Train | Train | Validate | Test | Train |
+| 4-0 | Test | Train | Train | Train | Validate |
+| 4-1 | Test | Train | Validate | Train | Train |
+| 4-2 | Validate | Train | Test | Train | Train |
+| 4-3 | Train | Train | Train | Test | Train |
+| 5-0 | Train | Validate | Train | Train | Test |
+| 5-1 | Train | Test | Train | Validate | Train |
