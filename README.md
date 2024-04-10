@@ -11,7 +11,7 @@ Yen-Chia Hsu, Ting-Hao (Kenneth) Huang, Ting-Yao Hu, Paul Dille, Sean Prendi, Ry
 - RISE-Dataset-2020-02-24: https://github.com/CMU-CREATE-Lab/deep-smoke-machine/tree/master/back-end/data/dataset/2020-02-24
 
 
-### Used splits on the merged dataset
+### Used splits on the rise dataset
 
 | View | S<sub>0</sub> | S<sub>1</sub> | S<sub>2</sub> | S<sub>4</sub> | S<sub>5</sub> |
 | --- | --- | --- | --- | --- | --- |
@@ -34,14 +34,19 @@ Yen-Chia Hsu, Ting-Hao (Kenneth) Huang, Ting-Yao Hu, Paul Dille, Sean Prendi, Ry
 | 2-0 | Test | Test | Test | Test | Test |
 | 2-1 | Test | Test | Test | Test | Test |
 | 2-2 | Test | Test | Test | Test | Test |
-| 3-0 | Test | Test | Test | Test | Test |
-| 3-1 | Test | Test | Test | Test | Test |
-| 3-2 | Validate | Train | Test | Train | Train |
-| 3-3 | Train | Train | Test | Train | Validate |
-| 3-4 | Train | Train | Validate | Test | Train |
-| 4-0 | Test | Train | Train | Train | Validate |
-| 4-1 | Test | Train | Validate | Train | Train |
-| 4-2 | Validate | Train | Test | Train | Train |
-| 4-3 | Train | Train | Train | Test | Train |
-| 5-0 | Train | Validate | Train | Train | Test |
-| 5-1 | Train | Test | Train | Validate | Train |
+
+### Used splits on the ijmond dataset
+
+| View | S<sub>0</sub> | S<sub>1</sub> | S<sub>2</sub> | S<sub>4</sub> | S<sub>5</sub> |
+| --- | --- | --- | --- | --- | --- |
+| 0-0 | Test | Test | Test | Test | Test |
+| 0-1 | Test | Test | Test | Test | Test |
+| 0-2 | Validate | Train | Test | Train | Train |
+| 0-3 | Train | Train | Test | Train | Validate |
+| 0-4 | Train | Train | Validate | Test | Train |
+| 1-0 | Test | Train | Train | Train | Validate |
+| 1-1 | Test | Train | Validate | Train | Train |
+| 1-2 | Validate | Train | Test | Train | Train |
+| 1-3 | Train | Train | Train | Test | Train |
+| 2-0 | Train | Validate | Train | Train | Test |
+| 2-1 | Train | Test | Train | Validate | Train |

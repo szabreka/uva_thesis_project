@@ -16,7 +16,7 @@ def split_and_save_data(vm, target_key_type, method="assign", no_link=False):
             if "url_root" in v: del v["url_root"]
         vm_dict[k].append(v)
 
-    p = "data/split/"
+    p = "data/ijmond_split/"
     check_and_create_dir(p)
     print("="*40)
     print("="*40)
@@ -30,25 +30,25 @@ def split_and_save_data(vm, target_key_type, method="assign", no_link=False):
         if target_key_type == "camera":
             three_splits = [
                 {
-                    "train": ["0-0", "0-3", "0-6", "0-8", "0-12", "0-2", "0-5", "0-9", "0-11", "0-14", "3-3", "3-4", "4-3", "5-0", "5-1"],
-                    "valid": ["0-4", "0-10", "3-2", "4-2"],
-                    "test": ["1-0", "2-0", "2-1", "2-2", "0-1", "0-7", "0-13", "3-0", "3-1", "4-0", "4-1"]
+                    "train": ["0-3", "0-4", "1-3", "2-0", "2-1"],
+                    "valid": ["0-2", "1-2"],
+                    "test": ["0-0", "0-1", "1-0", "1-1"]
                 }, {
-                    "train": ["0-1", "0-4", "0-7", "0-10", "0-13", "0-0", "0-3", "0-6", "0-8", "0-12", "3-2", "3-3", "3-4", "4-0", "4-1", "4-2", "4-3"],
-                    "valid": ["0-5", "0-11", "5-0"],
-                    "test": ["1-0", "2-0", "2-1", "2-2", "0-2", "0-9", "0-14","3-0", "3-1", "5-1"]
+                    "train": [ "0-2", "0-3", "0-4", "1-0", "1-1", "1-2", "1-3"],
+                    "valid": [ "2-0"],
+                    "test": ["0-0", "0-1", "2-1"]
                 }, {
-                    "train": ["0-2", "0-5", "0-9", "0-11", "0-14", "0-1", "0-4", "0-7", "0-10", "0-13", "4-0", "4-3", "5-0", "5-1"],
-                    "valid": ["0-3", "0-8", "3-4", "4-1"],
-                    "test": ["1-0", "2-0", "2-1", "2-2", "0-0", "0-6", "0-12", "3-0", "3-1", "3-2", "3-3", "4-2"]
+                    "train": ["1-0", "1-3", "2-0", "2-1"],
+                    "valid": [ "0-4", "1-1"],
+                    "test": ["0-0", "0-1", "0-2", "0-3", "1-2"]
                 }, {
-                    "train": ["0-0", "0-1", "0-2", "0-3", "0-5", "0-6", "0-11", "0-12", "0-13", "0-14", "3-2", "3-3", "4-0", "4-1", "4-2", "5-0"],
-                    "valid": ["0-7", "0-9", "5-1"],
-                    "test": ["1-0", "2-0", "2-1", "2-2", "0-4", "0-8", "0-10", "3-0", "3-1", "3-4", "4-3"]
+                    "train": ["0-2", "0-3", "1-0", "1-1", "1-2", "2-0"],
+                    "valid": ["2-1"],
+                    "test": ["0-0", "0-1", "0-4", "1-3"]
                 }, {
-                    "train": ["0-0", "0-1", "0-2", "0-7", "0-8", "0-9", "0-10", "0-12", "0-13", "0-14", "3-2", "3-4", "4-1", "4-2", "4-3", "5-1"],
-                    "valid": ["0-4", "0-6", "3-3", "4-0"],
-                    "test": ["1-0", "2-0", "2-1", "2-2", "0-3", "0-5", "0-11", "3-0", "3-1", "5-0"]
+                    "train": ["0-2", "0-4", "1-1", "1-2", "1-3", "2-1"],
+                    "valid": ["0-3", "1-0"],
+                    "test": ["0-0", "0-1", "2-0"]
                 }]
             for i in range(len(three_splits)):
                 print("-"*20)
@@ -62,7 +62,7 @@ def split_and_save_data(vm, target_key_type, method="assign", no_link=False):
         elif target_key_type == "date":
             target_keys = list(vm_dict.keys())
             target_keys = sorted(target_keys)[::-1]
-            train_key, valid_key, test_key = divide_list(target_keys, frac_valid=0.095, frac_test=0.28)
+            train_key, valid_key, test_key = divide_list(target_keys, frac_valid=0.09, frac_test=0.26)
             vm_train, vm_valid, vm_test = split(vm_dict, target_key_type,
                     train_key=train_key, valid_key=valid_key, test_key=test_key)
             save_json(vm_valid, p+"metadata_validation_split_by_"+target_key_type+".json")
@@ -128,7 +128,7 @@ def print_distribution(vm, target_key_type):
 def to_key(v, target_key_type):
     # The file name contains information about camera, date, and bounding box
     # We can use this as the key of the dataset for separating training, validation, and test sets
-    #key = v["file_name"].split("-")
+    #key = v["start_time"].split("-")
     if target_key_type == "camera":
         #return "-".join(key[0:2])
         return f"{v['camera_id']}-{v['view_id']}"
@@ -217,7 +217,7 @@ def main(argv):
         print("Must confirm by running: python split_metadata.py confirm")
         return
 
-    vm = load_json("data/metadata.json")
+    vm = load_json("data/ijmond_dataset.json")
     vm = aggregate_label(vm)
     method = "assign"
     no_link = True
