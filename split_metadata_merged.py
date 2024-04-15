@@ -217,7 +217,7 @@ def main(argv):
         print("Must confirm by running: python split_metadata.py confirm")
         return
 
-    vm = load_json("data/metadata.json")
+    vm = load_json("data/datasets/merged_dataset.json")
     vm = aggregate_label(vm)
     method = "assign"
     no_link = True
