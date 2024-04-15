@@ -38,7 +38,7 @@ def array_to_event(array, max_len=None):
     event = []
     array = copy.deepcopy(array)
     array.insert(0, 0) # insert a zero at the begining
-    if max_len is not None and max_len < 1: max_len = None
+    if max_len != None and max_len < 1: max_len = None
     for i in range(len(array)-1):
         a_i1 = array[i+1]
         diff = a_i1 - array[i]
@@ -49,7 +49,7 @@ def array_to_event(array, max_len=None):
         elif diff == 0: # from 0 to 0, or from 1 to 1
             if a_i1 == 1: # from 1 to 1
                 event[-1][1] = i
-                if max_len is not None and i-event[-1][0]+1 >= max_len:
+                if max_len != None and i-event[-1][0]+1 >= max_len:
                     array[i+1] = 0 # restart next event
     return event
 
@@ -107,7 +107,7 @@ def is_file_here(file_path):
 
 # Check if a directory exists, if not, create it
 def check_and_create_dir(path):
-    if path is None: return
+    if path == None: return
     dir_name = os.path.dirname(path)
     if dir_name != "" and not os.path.exists(dir_name):
         try: # this is used to prevent race conditions during parallel computing
@@ -169,7 +169,7 @@ def get_esdr_access_token(auth_json):
     headers = {"Authorization": "", "Content-Type": "application/json"}
     r = requests.post(url, data=json.dumps(auth_json), headers=headers)
     r_json = r.json()
-    if r.status_code is not 200:
+    if r.status_code != 200:
         print("ERROR! ESDR returns:" + json.dumps(r_json))
         return None, None
     else:
@@ -208,7 +208,7 @@ def upload_data_to_esdr(device_name, data_json, product_id, access_token, **opti
     r_json = r.json()
     device_id = None
     print("\tESDR returns: " + json.dumps(r_json) + " when getting the device ID for '" + device_name + "'")
-    if r.status_code is 200:
+    if r.status_code == 200:
         if r_json["data"]["totalCount"] < 1:
             print("\t'" + device_name + "' did not exist")
         else:
@@ -216,7 +216,7 @@ def upload_data_to_esdr(device_name, data_json, product_id, access_token, **opti
             print("\tReceive existing device ID " + str(device_id))
 
     # Create a device if it does not exist
-    if device_id is None:
+    if device_id == None:
         print("\tCreate a device for '" + device_name + "'")
         url = esdr_root_url() + "api/v1/products/" + str(product_id) + "/devices"
         device_json = {
@@ -226,7 +226,7 @@ def upload_data_to_esdr(device_name, data_json, product_id, access_token, **opti
         r = requests.post(url, data=json.dumps(device_json), headers=headers)
         r_json = r.json()
         print("\tESDR returns: " + json.dumps(r_json) + " when creating a device for '" + device_name + "'")
-        if r.status_code is 201:
+        if r.status_code == 201:
             device_id = r_json["data"]["id"]
             print("\tCreate new device ID " + str(device_id))
         else:
@@ -241,7 +241,7 @@ def upload_data_to_esdr(device_name, data_json, product_id, access_token, **opti
     api_key = None
     api_key_read_only = None
     print("\tESDR returns: " + json.dumps(r_json) + " when getting the feed ID")
-    if r.status_code is 200:
+    if r.status_code == 200:
         if r_json["data"]["totalCount"] < 1:
             print("\tNo feed ID exists for device " + str(device_id))
         else:
@@ -266,7 +266,7 @@ def upload_data_to_esdr(device_name, data_json, product_id, access_token, **opti
         r = requests.post(url, data=json.dumps(feed_json), headers=headers)
         r_json = r.json()
         print("\tESDR returns: " + json.dumps(r_json) + " when creating a feed")
-        if r.status_code is 201:
+        if r.status_code == 201:
             feed_id = r_json["data"]["id"]
             api_key = r_json["data"]["apiKey"]
             api_key_read_only = r_json["data"]["apiKeyReadOnly"]
@@ -280,7 +280,7 @@ def upload_data_to_esdr(device_name, data_json, product_id, access_token, **opti
     r = requests.put(url, data=json.dumps(data_json), headers=headers)
     r_json = r.json()
     print("\tESDR returns: " + json.dumps(r_json) + " when uploading data")
-    if r.status_code is not 200:
+    if r.status_code != 200:
         return None
 
     # Return a list of information for getting data from ESDR
@@ -305,7 +305,7 @@ def confusion_matrix_of_samples(y_true, y_pred, n=None):
     if len(y_true) != len(y_pred):
         print("Error! y_true and y_pred have different lengths.")
         return
-    if y_true is None or y_pred is None:
+    if y_true == None or y_pred == None:
         print("Error! y_true or y_pred is None.")
         return
 
@@ -315,7 +315,7 @@ def confusion_matrix_of_samples(y_true, y_pred, n=None):
         cm[y_true[i]][y_pred[i]].append(i)
 
     # Randomly sample the confusion matrix
-    if n is not None:
+    if n != None:
         for u in cm:
             for v in cm[u]:
                 s = cm[u][v] # get the items
@@ -337,7 +337,7 @@ def write_video_summary(cm, file_name, p_frame, p_save, global_step=None, fps=12
     for u in cm:
         for v in cm[u]:
             tag = "true_%d_prediction_%d" % (u, v)
-            if global_step is not None:
+            if global_step != None:
                 tag += "_step_%d" % global_step
             grid_x = []
             grid_y = []
