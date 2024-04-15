@@ -1,6 +1,8 @@
 #ignore data related changes
-data/*
 .DS_Store
+data/ijmond_split/*
+data/ijmond_videos/*
+data/split/*
 __pycache__/
 .idea/
 .ipynb_checkpoints/
