@@ -2,38 +2,38 @@ def get_label(row):
     mode = get_mode(row)
     if mode == 'individual mode R':
         if row['label_state_admin'] == 23:
-            return 'smoke'
+            return '1'
         if row['label_state_admin'] == 16:
-            return 'no smoke'
+            return '0'
         if row['label_state_admin'] == 47:
-            return 'smoke'
+            return '1'
         if row['label_state_admin'] == 32:
-            return 'no smoke'
+            return '0'
 
     elif mode == 'individual mode C':
         if row['label_state'] == 23:
-            return 'smoke'
+            return '1'
         if row['label_state'] == 16:
-            return 'no smoke'
+            return '0'
         if row['label_state'] == 19:
-            return 'smoke'
+            return '1'
         if row['label_state'] == 20:
-            return 'no smoke'
+            return '0'
         
     elif mode == 'collaborative mode':
         if row['label_state_admin'] == 23:
-            return 'smoke'
+            return '1'
         if row['label_state_admin'] == 16:
-            return 'no smoke'
+            return '0'
         if row['label_state_admin'] == 47:
-            return 'smoke'
+            return '1'
         if row['label_state_admin'] == 32:
-            return 'no smoke'
+            return '0'
         else:
             if row['label_state'] == 23:
-                return 'smoke'
+                return '1'
             if row['label_state'] == 16:
-                return 'no smoke'
+                return '0'
             
     if row['label_state_admin'] == -2:
         return 'bad videos'
