@@ -75,8 +75,9 @@ def get_video_url(v):
 
 # Download all videos in the metadata json file
 def main(argv):
-    json_file_path = "data/metadata_02242020.json"
-    download_path = "data/rise_videos/"
+    #json_file_path = "data/metadata_02242020.json"
+    json_file_path = "data/datasets/metadata_02242020.json"
+    download_path = "/projects/0/prjs0930/data/merged_videos/"
     check_and_create_dir(download_path)
     problem_video_ids = []
     # Open the file and load its contents into a dictionary
