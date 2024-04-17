@@ -6,17 +6,24 @@ import os
 import pandas as pd
 from EDA.eda_functions import get_label
 
+#This model is able to predict the label of a video based on the frames + get the true label of the video
+
 # Define device
-device = "cuda" if torch.cuda.is_available() else "cpu"
+if torch.cuda.is_available():
+    device = torch.device("cuda") # use CUDA device
+elif torch.backends.mps.is_available():
+    device = torch.device("mps") # use MacOS GPU device (e.g., for M1 chips)
+else:
+    device = torch.device("cpu") # use CPU device
+
+#load model and ijmond dataset
 model, preprocess = clip.load('ViT-B/32', device)
-example_file_name = "rsBRGyFrPwM-1"
-example_path = f"data/ijmond_videos/{example_file_name}.mp4"
 ijmond_df = pd.read_json('data/datasets/ijmond_dataset.json')
 
 #define class names in a list - it need prompt engineering
 class_names = ["a photo of a factory emiting smoke", "a photo of a factory with no smoke above chimney"]
 
-#Crete a list of images from video
+#Func to create a list of images from video
 def preprocess_video(video_path):
     # Open the video file
     # example video : video_path = 'data/ijmond_videos/5PurGkmy0aw-1.mp4'
@@ -36,8 +43,13 @@ def preprocess_video(video_path):
         video.release()
     return frames
 
+#func to get the true label of the video
+def get_true_label(file_name):
+    row = ijmond_df[ijmond_df['file_name'] == file_name].iloc[0]
+    return get_label(row)
 
-def vanilla_clip(video_path):
+#clip model to predict class for each frame in video
+def vanilla_clip(video_path, file_name):
     #Create image list from video
     frames = preprocess_video(video_path)
 
@@ -67,20 +79,22 @@ def vanilla_clip(video_path):
             prediction_list.append(1)       
 
         # Print predictions for each frame
-        print(f"\nPredictions for frame {i}:\n")
-        for value, index in zip(values, indices):
-            print(f"{class_names[index]:>16s}: {100 * value.item():.2f}%")
+        #print(f"\nPredictions for frame {i}:\n")
+        #for value, index in zip(values, indices):
+        #    print(f"{class_names[index]:>16s}: {100 * value.item():.2f}%")
         i+=1
+    print(file_name)
     print(prediction_list)
-    print("True label:", get_true_label(example_file_name))
+    print("True label:", get_true_label(file_name))
     if sum(prediction_list) >= 3:
-        print("The video contains smoke")
         return 1
     else:
         return 0
 
-def get_true_label(file_name):
-    row = ijmond_df[ijmond_df['file_name'] == file_name].iloc[0]
-    return get_label(row)
+#predict label for each video in ijmond dir
+files = os.listdir("data/ijmond_videos/")
+for file in files:
+    video_path = f"data/ijmond_videos/{file}"
+    file_name = file.split('.')[0]
+    vanilla_clip(video_path, file_name)
 
-vanilla_clip(example_path)
