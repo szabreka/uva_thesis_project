@@ -60,16 +60,55 @@ def split_and_save_data(vm, target_key_type, method="assign", no_link=False):
                 save_json(vm_test, p+"metadata_test_split_"+str(i)+"_by_"+target_key_type+".json")
                 save_json(vm_train, p+"metadata_train_split_"+str(i)+"_by_"+target_key_type+".json")
         elif target_key_type == "date":
-            target_keys = list(vm_dict.keys())
-            target_keys = sorted(target_keys)[::-1]
-            train_key, valid_key, test_key = divide_list(target_keys, frac_valid=0.095, frac_test=0.28)
-            vm_train, vm_valid, vm_test = split(vm_dict, target_key_type,
-                    train_key=train_key, valid_key=valid_key, test_key=test_key)
+
+            vm_sorted = sorted(vm, key=lambda x: x.get('start_time'))
+
+            # Separate the dataset into two groups based on the "dataset" column
+            vm_ijmond = [v for v in vm_sorted if v['dataset'] == 'ijmond']
+            vm_rise = [v for v in vm_sorted if v['dataset'] == 'rise']
+
+            # Calculate the number of samples for each dataset
+            num_ijmond = len(vm_ijmond)
+            print(num_ijmond)
+            num_rise = len(vm_rise)
+            print(num_rise)
+
+            # Define the proportions for each split
+            proportions = {'train': 0.61, 'valid': 0.14, 'test': 0.25}
+
+            # Calculate the number of samples for each split
+            num_train_ijmond = int(proportions['train'] * num_ijmond)
+            num_train_rise = int(proportions['train'] * num_rise)
+            num_valid_ijmond = int(proportions['valid'] * num_ijmond)
+            num_valid_rise = int(proportions['valid'] * num_rise)
+            num_test_ijmond = int(proportions['test'] * num_ijmond)
+            num_test_rise = int(proportions['test'] * num_rise)
+
+            # Split each dataset separately
+            vm_train_ijmond, vm_valid_ijmond, vm_test_ijmond = split_dataset(vm_ijmond, num_train_ijmond, num_valid_ijmond, num_test_ijmond)
+            vm_train_rise, vm_valid_rise, vm_test_rise = split_dataset(vm_rise, num_train_rise, num_valid_rise, num_test_rise)
+
+            # Combine the splits from both datasets
+            vm_train = vm_train_ijmond + vm_train_rise
+            vm_valid = vm_valid_ijmond + vm_valid_rise
+            vm_test = vm_test_ijmond + vm_test_rise
+
+            # Save the splits
             save_json(vm_valid, p+"metadata_validation_split_by_"+target_key_type+".json")
             save_json(vm_test, p+"metadata_test_split_by_"+target_key_type+".json")
             save_json(vm_train, p+"metadata_train_split_by_"+target_key_type+".json")
+
     print("The data split is saved in: " + p)
 
+#Function for date splitting
+def split_dataset(dataset, num_train, num_valid, num_test):
+
+    # Split the dataset
+    vm_train = dataset[:num_train]
+    vm_valid = dataset[num_train:num_train + num_valid]
+    vm_test = dataset[num_train + num_valid:num_train + num_valid + num_test]
+
+    return vm_train, vm_valid, vm_test
 
 def divide_list(target_keys, frac_valid=0.1, frac_test=0.3):
     n_keys = len(target_keys)
@@ -222,7 +261,7 @@ def main(argv):
     method = "assign"
     no_link = True
     split_and_save_data(vm, "date", method=method, no_link=no_link)
-    split_and_save_data(vm, "camera", method=method, no_link=no_link)
+    #split_and_save_data(vm, "camera", method=method, no_link=no_link)
 
 
 if __name__ == "__main__":
