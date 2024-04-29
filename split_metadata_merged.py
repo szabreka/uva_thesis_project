@@ -172,7 +172,7 @@ def to_key(v, target_key_type):
         #return "-".join(key[0:2])
         return f"{v['camera_id']}-{v['view_id']}"
     elif target_key_type == "date":
-        date_component = v['start_time'] // (24 * 3600)  # Convert to date component
+        date_component = v['start_time'] // (24 * 60 * 60)  # Convert to date component by dividing with the hours, the minutes and seconds
         return date_component
 
 
@@ -261,7 +261,7 @@ def main(argv):
     method = "assign"
     no_link = True
     split_and_save_data(vm, "date", method=method, no_link=no_link)
-    #split_and_save_data(vm, "camera", method=method, no_link=no_link)
+    split_and_save_data(vm, "camera", method=method, no_link=no_link)
 
 
 if __name__ == "__main__":
