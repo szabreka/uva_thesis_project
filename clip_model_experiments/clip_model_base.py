@@ -1,3 +1,4 @@
+#Base model giving a prediction of each frame in a video based on the CLIP model
 import torch
 import clip
 from PIL import Image
@@ -7,7 +8,7 @@ import os
 # Define device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load('ViT-B/32', device)
-example_path = 'data/ijmond_videos/5PurGkmy0aw-1.mp4'
+example_path = '../data/ijmond_videos/5PurGkmy0aw-1.mp4'
 
 #define class names in a list - it need prompt engineering
 class_names = ["indstrial plant with smoke above chimney", "indstrial plant with no smoke above chimney"]

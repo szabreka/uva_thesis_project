@@ -1,3 +1,5 @@
+#CLIP model using each frame of a video to predict class
+
 import torch
 import clip
 from PIL import Image
@@ -92,9 +94,9 @@ def vanilla_clip(video_path, file_name):
         return 0
 
 #predict label for each video in ijmond dir
-files = os.listdir("data/ijmond_videos/")
+files = os.listdir("../data/ijmond_videos/")
 for file in files:
-    video_path = f"data/ijmond_videos/{file}"
+    video_path = f"../data/ijmond_videos/{file}"
     file_name = file.split('.')[0]
     vanilla_clip(video_path, file_name)
 
