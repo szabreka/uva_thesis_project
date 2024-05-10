@@ -96,14 +96,16 @@ class ImageTitleDataset(Dataset):
     
 #Define training data
 # Load the JSON metadata
-with open('data/datasets/experimental_ijmond_dataset.json', 'r') as f:
-    train_data = json.load(f)
+#with open('data/datasets/experimental_ijmond_dataset.json', 'r') as f:
+#    train_data = json.load(f)
+with open('/data/split/metadata_test_split_by_date.json', 'r') as f:
+    test_data = json.load(f)
 # Convert the dataset to a Pandas DataFrame
-train_data = pd.DataFrame(train_data)
+test_data = pd.DataFrame(test_data)
 # Prepare the list of video file paths and labels
-list_video_path = [os.path.join("data/ijmond_videos/", f"{fn}.mp4") for fn in train_data['file_name']]
+list_video_path = [os.path.join("data/ijmond_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
 #list_labels = dataset['label'].tolist()
-list_labels = [int(label) for label in train_data['label']]
+list_labels = [int(label) for label in test_data['label']]
 #Define class names in a list - it needs prompt engineering
 class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"]
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"]
