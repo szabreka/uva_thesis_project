@@ -124,13 +124,13 @@ test_list_labels = [int(label) for label in test_data['label']]
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
-#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
+class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
 #class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
 #class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
-class_names = ['no smoke', 'smoke']
+#class_names = ['no smoke', 'smoke']
 
 # Define input resolution
 input_resolution = (224, 224)
@@ -147,10 +147,14 @@ train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, clas
 val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, class_names, transform)
 test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_names, transform)
 
+print('Datasets created')
+
 #Create dataloader fot training and validation
 
 train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
+
+print('Dataloaders created')
 
 # Function to convert model's parameters to FP32 format
 #This is done so that our model loads in the provided memory
@@ -172,6 +176,7 @@ loss_txt = nn.CrossEntropyLoss()
 
 # Model training
 num_epochs = 50
+print('starts training')
 for epoch in range(num_epochs):
   model.train()
   pbar = tqdm(train_dataloader, total=len(train_dataloader))
@@ -203,15 +208,15 @@ for epoch in range(num_epochs):
     value, index = similarity[0].topk(1)
     ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
 
-    # Convert similarity scores to predicted labels
-    predicted_label = index.cpu().numpy()
-    ground_truth_label = ground_truth.cpu().numpy()
-
     #Compute loss - contrastive loss to pull similar pairs closer together
     #total_loss = (loss_img(logits_per_image,ground_truth) + loss_txt(logits_per_text.T,ground_truth))/2
 
     #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
-    total_loss = loss_img(predicted_label,ground_truth_label) 
+    total_loss = loss_img(index, ground_truth) 
+
+    # Convert similarity scores to predicted labels
+    predicted_label = index.cpu().numpy()
+    ground_truth_label = ground_truth.cpu().numpy()
     
     train_accuracy = accuracy_score(ground_truth_label, predicted_label)
     print('Train accuracy: ', train_accuracy)
@@ -262,12 +267,15 @@ for epoch in range(num_epochs):
             value, index = similarity[0].topk(1)
             ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
 
+            print('Index: ', index)
+            print('Ground truth: ', ground_truth)
+
+            #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
+            total_loss = loss_img(index,ground_truth) 
+
             # Convert similarity scores to predicted labels
             predicted_label = index.cpu().numpy()
             ground_truth_label = ground_truth.cpu().numpy()
-
-            #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
-            total_loss = loss_img(predicted_label,ground_truth_label) 
 
             # Append predicted labels and ground truth labels
             all_preds.append(predicted_label)
@@ -289,6 +297,7 @@ for epoch in range(num_epochs):
   print("Confusion Matrix:")
   print(conf_matrix)
 
+print('Start testing')
 def test_clip(dataset):
     predicted_labels= []
     ground_truths = []
