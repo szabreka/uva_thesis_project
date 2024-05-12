@@ -201,20 +201,19 @@ for epoch in range(num_epochs):
     logits_per_image = logits_per_image.float()
     logits_per_text = logits_per_text.float()
 
-    #logits_per_image, logits_per_text = model(images, text_inputs)
-    similarity = logits_per_image[0].softmax(dim=-1)
-
-    #values are the probabilities, indicies are the classes
-    value, index = similarity[0].topk(1)
+    #Ground truth
     ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
 
     #Compute loss - contrastive loss to pull similar pairs closer together
     #total_loss = (loss_img(logits_per_image,ground_truth) + loss_txt(logits_per_text.T,ground_truth))/2
 
     #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
-    total_loss = loss_img(index, ground_truth) 
+    total_loss = loss_img(logits_per_image, ground_truth) 
 
-    # Convert similarity scores to predicted labels
+    # Get and convert similarity scores to predicted labels
+    similarity = logits_per_image[0].softmax(dim=-1)
+
+    #Convert values to numpy
     predicted_label = index.cpu().numpy()
     ground_truth_label = ground_truth.cpu().numpy()
     
@@ -267,11 +266,8 @@ for epoch in range(num_epochs):
             value, index = similarity[0].topk(1)
             ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
 
-            print('Index: ', index)
-            print('Ground truth: ', ground_truth)
-
             #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
-            total_loss = loss_img(index,ground_truth) 
+            total_loss = loss_img(logits_per_image,ground_truth) 
 
             # Convert similarity scores to predicted labels
             predicted_label = index.cpu().numpy()
