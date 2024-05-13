@@ -124,28 +124,40 @@ test_list_labels = [int(label) for label in test_data['label']]
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
-class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
+#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
 #class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
 #class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
-#class_names = ['no smoke', 'smoke']
+class_names = ['no smoke', 'smoke']
 
 # Define input resolution
 input_resolution = (224, 224)
 
 # Define the transformation pipeline - from CLIP preprocessor without random crop augmentation
-transform = transforms.Compose([
+train_transform = transforms.Compose([
+    transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
+    transforms.ToTensor(),
+    transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711])
+])
+
+val_transform = transforms.Compose([
+    transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
+    transforms.ToTensor(),
+    transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711])
+])
+
+test_transform = transforms.Compose([
     transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
     transforms.ToTensor(),
     transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711])
 ])
 
 # Create dataset and data loader for training, validation and testing
-train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, class_names, transform)
-val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, class_names, transform)
-test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_names, transform)
+train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, class_names, train_transform)
+val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, class_names, val_transform)
+test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_names, test_transform)
 
 print('Datasets created')
 
@@ -168,14 +180,14 @@ if device == "cpu":
   model.float()
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=5e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+optimizer = torch.optim.Adam(model.parameters(), lr=5e-7,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 
 # Specify the loss functions - for images and for texts
 loss_img = nn.CrossEntropyLoss()
 loss_txt = nn.CrossEntropyLoss()
 
 # Model training
-num_epochs = 50
+num_epochs = 10
 print('starts training')
 for epoch in range(num_epochs):
     model.train()
@@ -276,9 +288,6 @@ for epoch in range(num_epochs):
                 predicted_label = index.cpu().numpy()
                 ground_truth_label = ground_truth.cpu().numpy()
 
-                print('Predicted label: ', predicted_label)
-                print('Ground truth: ', ground_truth_label)
-
                 # Append predicted labels and ground truth labels
                 all_preds.append(predicted_label)
                 all_labels.append(ground_truth_label)
@@ -292,19 +301,40 @@ for epoch in range(num_epochs):
                 val_precision = precision_score(ground_truth_label, predicted_label, average='binary')
                 print('Validation precision per round: ', val_precision)
 
+                f_score = f1_score(ground_truth_label, predicted_label, average='binary')
+                print('Validation f1 score per round: ', f_score)
+
                 # Update the progress bar with the current epoch and loss
                 vbar.set_description(f"Validation: {i}/{len(val_dataloader)}, Validation loss: {total_loss.item():.4f}")
                 i+=1
     
-    print('All labels: ',all_labels)
-    print('All preds: ', all_preds)
+    # Convert lists of arrays to numpy arrays
+    all_labels_array = np.concatenate(all_labels)
+    all_preds_array = np.concatenate(all_preds)
+
+    # Convert to 1D arrays
+    all_labels_flat = all_labels_array.flatten()
+    all_preds_flat = all_preds_array.flatten()
+
+    # Ensure they are integers
+    all_labels_int = all_labels_flat.astype(int)
+    all_preds_int = all_preds_flat.astype(int)
 
     # Calculate confusion matrix
-    conf_matrix = confusion_matrix(all_labels, all_preds)
+    conf_matrix = confusion_matrix(all_labels_int, all_preds_int)
 
     # Print or visualize the confusion matrix
     print("Confusion Matrix:")
     print(conf_matrix)
+
+    precision = precision_score(all_labels_int, all_preds_int, average='binary')
+    print("Precision: ", precision)
+
+    f_score= f1_score(all_labels_int, all_preds_int, average='binary')
+    print('F-score: ', f1_score)
+
+    acc = accuracy_score(all_labels_int, all_preds_int)
+    print('Accuracy: ', acc)
 
 print('Start testing')
 def test_clip(dataset):
@@ -348,18 +378,33 @@ def test_clip(dataset):
 
         predicted_labels.append(predicted_label)
         ground_truths.append(ground_truth_label)
-    
+
+    # Convert lists of arrays to numpy arrays
+    all_labels_array = np.concatenate(ground_truths)
+    all_preds_array = np.concatenate(predicted_labels)
+
+    # Convert to 1D arrays
+    all_labels_flat = all_labels_array.flatten()
+    all_preds_flat = all_preds_array.flatten()
+
+    # Ensure they are integers
+    all_labels_int = all_labels_flat.astype(int)
+    all_preds_int = all_preds_flat.astype(int)
+
+    print('All labels int: ', all_labels_int)
+    print('All preds int: ', all_preds_int)
+
     # Compute accuracy
-    accuracy = accuracy_score(ground_truths, predicted_labels)
+    accuracy = accuracy_score(all_labels_int, all_preds_int)
 
     # Compute precision
-    precision = precision_score(ground_truths, predicted_labels, average='binary')
+    precision = precision_score(all_labels_int, all_preds_int, average='binary')
 
     # Compute recall
-    recall = recall_score(ground_truths, predicted_labels, average='binary')
+    recall = recall_score(all_labels_int, all_preds_int, average='binary')
 
     # Compute F1 score
-    f1 = f1_score(ground_truths, predicted_labels, average='binary')
+    f1 = f1_score(all_labels_int, all_preds_int, average='binary')
     
     # Print or log the metrics
     print(f"Test Accuracy: {accuracy:.4f}")
