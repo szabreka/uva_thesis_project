@@ -212,7 +212,8 @@ for epoch in range(num_epochs):
 
     # Get and convert similarity scores to predicted labels
     similarity = logits_per_image[0].softmax(dim=-1)
-
+    value, index = similarity[0].topk(1)
+    
     #Convert values to numpy
     predicted_label = index.cpu().numpy()
     ground_truth_label = ground_truth.cpu().numpy()
