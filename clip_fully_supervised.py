@@ -211,8 +211,8 @@ for epoch in range(num_epochs):
     total_loss = loss_img(logits_per_image, ground_truth) 
 
     # Get and convert similarity scores to predicted labels
-    similarity = logits_per_image[0].softmax(dim=-1)
-    value, index = similarity[0].topk(1)
+    similarity = logits_per_image.softmax(dim=-1)
+    value, index = similarity.topk(1)
     
     #Convert values to numpy
     predicted_label = index.cpu().numpy()
