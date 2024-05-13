@@ -187,7 +187,7 @@ loss_img = nn.CrossEntropyLoss()
 loss_txt = nn.CrossEntropyLoss()
 
 # Model training
-num_epochs = 10
+num_epochs = 1
 print('starts training')
 for epoch in range(num_epochs):
     model.train()
@@ -298,10 +298,13 @@ for epoch in range(num_epochs):
                 val_accuracy = accuracy_score(ground_truth_label, predicted_label)
                 print('Validation accuracy per round: ', val_accuracy)
 
-                val_precision = precision_score(ground_truth_label, predicted_label, average='binary')
+                val_precision = precision_score(ground_truth_label, predicted_label, average='binary', zero_division=np.nan)
                 print('Validation precision per round: ', val_precision)
 
-                f_score = f1_score(ground_truth_label, predicted_label, average='binary')
+                val_recall= recall_score(ground_truth_label, predicted_label, average='binary', zero_division=np.nan)
+                print("Validation recall: ", val_recall)
+
+                f_score = f1_score(ground_truth_label, predicted_label, average='binary', zero_division=np.nan)
                 print('Validation f1 score per round: ', f_score)
 
                 # Update the progress bar with the current epoch and loss
@@ -330,8 +333,11 @@ for epoch in range(num_epochs):
     precision = precision_score(all_labels_int, all_preds_int, average='binary')
     print("Precision: ", precision)
 
+    recall = recall_score(all_labels_int, all_preds_int, average='binary')
+    print('Recall: ', recall)
+
     f_score= f1_score(all_labels_int, all_preds_int, average='binary')
-    print('F-score: ', f1_score)
+    print('F-score: ', f_score)
 
     acc = accuracy_score(all_labels_int, all_preds_int)
     print('Accuracy: ', acc)
@@ -379,32 +385,17 @@ def test_clip(dataset):
         predicted_labels.append(predicted_label)
         ground_truths.append(ground_truth_label)
 
-    # Convert lists of arrays to numpy arrays
-    all_labels_array = np.concatenate(ground_truths)
-    all_preds_array = np.concatenate(predicted_labels)
-
-    # Convert to 1D arrays
-    all_labels_flat = all_labels_array.flatten()
-    all_preds_flat = all_preds_array.flatten()
-
-    # Ensure they are integers
-    all_labels_int = all_labels_flat.astype(int)
-    all_preds_int = all_preds_flat.astype(int)
-
-    print('All labels int: ', all_labels_int)
-    print('All preds int: ', all_preds_int)
-
     # Compute accuracy
-    accuracy = accuracy_score(all_labels_int, all_preds_int)
+    accuracy = accuracy_score(ground_truths, predicted_labels)
 
     # Compute precision
-    precision = precision_score(all_labels_int, all_preds_int, average='binary')
+    precision = precision_score(ground_truths, predicted_labels, average='binary')
 
     # Compute recall
-    recall = recall_score(all_labels_int, all_preds_int, average='binary')
+    recall = recall_score(ground_truths, predicted_labels, average='binary')
 
     # Compute F1 score
-    f1 = f1_score(all_labels_int, all_preds_int, average='binary')
+    f1 = f1_score(ground_truths, predicted_labels, average='binary')
     
     # Print or log the metrics
     print(f"Test Accuracy: {accuracy:.4f}")
