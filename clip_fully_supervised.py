@@ -178,120 +178,133 @@ loss_txt = nn.CrossEntropyLoss()
 num_epochs = 50
 print('starts training')
 for epoch in range(num_epochs):
-  model.train()
-  pbar = tqdm(train_dataloader, total=len(train_dataloader))
-  for batch in pbar:
-    # Extract images and texts from the batch
-    images, labels, true_label = batch 
+    model.train()
+    pbar = tqdm(train_dataloader, total=len(train_dataloader))
+    for batch in pbar:
+        # Extract images and texts from the batch
+        images, labels, true_label = batch 
 
-    # Move images and texts to the specified device (CPU or GPU)
-    images= images.to(device)
-    texts = labels.to(device)
-    true_label = true_label.to(device)
-    text_inputs = clip.tokenize(class_names).to(device)
+        # Move images and texts to the specified device (CPU or GPU)
+        images= images.to(device)
+        texts = labels.to(device)
+        true_label = true_label.to(device)
+        text_inputs = clip.tokenize(class_names).to(device)
 
-    #Squeeze texts tensor to match the required size
-    texts = texts.squeeze(dim = 1)
-    text_inputs = text_inputs.squeeze(dim = 1)
+        #Squeeze texts tensor to match the required size
+        texts = texts.squeeze(dim = 1)
+        text_inputs = text_inputs.squeeze(dim = 1)
 
-    # Forward pass - Run the model on the input data (images and texts)
-    logits_per_image, logits_per_text = model(images, text_inputs)
+        # Forward pass - Run the model on the input data (images and texts)
+        logits_per_image, logits_per_text = model(images, text_inputs)
 
-    #Transform logits to float to match required dtype 
-    logits_per_image = logits_per_image.float()
-    logits_per_text = logits_per_text.float()
+        #Transform logits to float to match required dtype 
+        logits_per_image = logits_per_image.float()
+        logits_per_text = logits_per_text.float()
 
-    #Ground truth
-    ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
+        #Ground truth
+        ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
 
-    #Compute loss - contrastive loss to pull similar pairs closer together
-    #total_loss = (loss_img(logits_per_image,ground_truth) + loss_txt(logits_per_text.T,ground_truth))/2
+        #Compute loss - contrastive loss to pull similar pairs closer together
+        #total_loss = (loss_img(logits_per_image,ground_truth) + loss_txt(logits_per_text.T,ground_truth))/2
 
-    #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
-    total_loss = loss_img(logits_per_image, ground_truth) 
+        #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
+        total_loss = loss_img(logits_per_image, ground_truth) 
 
-    # Get and convert similarity scores to predicted labels
-    similarity = logits_per_image.softmax(dim=-1)
-    value, index = similarity.topk(1)
+        # Get and convert similarity scores to predicted labels
+        similarity = logits_per_image.softmax(dim=-1)
+        value, index = similarity.topk(1)
+        
+        #Convert values to numpy
+        predicted_label = index.cpu().numpy()
+        ground_truth_label = ground_truth.cpu().numpy()
+        
+        train_accuracy = accuracy_score(ground_truth_label, predicted_label)
+        print('Train accuracy: ', train_accuracy)
+
+        # Zero out gradients for the optimizer (Adam) - to prevent adding gradients to previous ones
+        optimizer.zero_grad()
+
+        # Backward pass
+        total_loss.backward()
+        if device == "cpu":
+            optimizer.step()
+        else : 
+            # Convert model's parameters to FP32 format, update, and convert back
+            convert_models_to_fp32(model)
+            optimizer.step()
+            clip.model.convert_weights(model)
+        # Update the progress bar with the current epoch and loss
+        pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {total_loss.item():.4f}")
+
+    print('Validation loop starts')
+    model.eval()
+    val_losses = []
+    val_accs = []
+    all_preds = []
+    all_labels = []
+    with torch.no_grad():
+        vbar = tqdm(val_dataloader, total=len(val_dataloader))
+        i = 0
+        for batch in vbar:
+                # Extract images and texts from the batch
+                images, labels, true_label = batch 
+                # Move images and texts to the specified device
+                images = images.to(device)
+                texts = labels.to(device)
+                true_label = true_label.to(device)
+                text_inputs = clip.tokenize(class_names).to(device)
+                texts = texts.squeeze(dim=1)
+                text_inputs.squeeze(dim=1)
+
+                # Forward pass
+                logits_per_image, logits_per_text = model(images, text_inputs)
+
+                #Transform logits to float to match required dtype 
+                logits_per_image = logits_per_image.float()
+                logits_per_text = logits_per_text.float()
+
+                # Get and convert similarity scores to predicted labels - values are the probabilities, indicies are the classes
+                similarity = logits_per_image.softmax(dim=-1)
+                value, index = similarity.topk(1)
+
+                ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
+
+                #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
+                total_loss = loss_img(logits_per_image,ground_truth) 
+
+                # Convert similarity scores to predicted labels
+                predicted_label = index.cpu().numpy()
+                ground_truth_label = ground_truth.cpu().numpy()
+
+                print('Predicted label: ', predicted_label)
+                print('Ground truth: ', ground_truth_label)
+
+                # Append predicted labels and ground truth labels
+                all_preds.append(predicted_label)
+                all_labels.append(ground_truth_label)
+
+                # Append loss
+                val_losses.append(total_loss.item())
+
+                val_accuracy = accuracy_score(ground_truth_label, predicted_label)
+                print('Validation accuracy per round: ', val_accuracy)
+
+                val_precision = precision_score(ground_truth_label, predicted_label, average='binary')
+                print('Validation precision per round: ', val_precision)
+
+                # Update the progress bar with the current epoch and loss
+                vbar.set_description(f"Validation: {i}/{len(val_dataloader)}, Validation loss: {total_loss.item():.4f}")
+                i+=1
     
-    #Convert values to numpy
-    predicted_label = index.cpu().numpy()
-    ground_truth_label = ground_truth.cpu().numpy()
-    
-    train_accuracy = accuracy_score(ground_truth_label, predicted_label)
-    print('Train accuracy: ', train_accuracy)
+    print('All labels: ',all_labels)
+    print('All preds: ', all_preds)
 
-    # Zero out gradients for the optimizer (Adam) - to prevent adding gradients to previous ones
-    optimizer.zero_grad()
+    # Calculate confusion matrix
+    conf_matrix = confusion_matrix(all_labels, all_preds)
 
-    # Backward pass
-    total_loss.backward()
-    if device == "cpu":
-         optimizer.step()
-    else : 
-        # Convert model's parameters to FP32 format, update, and convert back
-        convert_models_to_fp32(model)
-        optimizer.step()
-        clip.model.convert_weights(model)
-    # Update the progress bar with the current epoch and loss
-    pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {total_loss.item():.4f}")
-
-  model.eval()
-  val_losses = []
-  val_accs = []
-  all_preds = []
-  all_labels = []
-  with torch.no_grad():
-      for batch in tqdm(val_dataloader, total=len(val_dataloader)):
-            # Extract images and texts from the batch
-            images, labels, true_label = batch 
-            # Move images and texts to the specified device
-            images = images.to(device)
-            texts = labels.to(device)
-            true_label = true_label.to(device)
-            text_inputs = clip.tokenize(class_names).to(device)
-            texts = texts.squeeze(dim=1)
-            text_inputs.squeeze(dim=1)
-
-            # Forward pass
-            logits_per_image, logits_per_text = model(images, text_inputs)
-
-            #Transform logits to float to match required dtype 
-            logits_per_image = logits_per_image.float()
-            logits_per_text = logits_per_text.float()
-
-            # Get and convert similarity scores to predicted labels - values are the probabilities, indicies are the classes
-            similarity = logits_per_image.softmax(dim=-1)
-            value, index = similarity.topk(1)
-
-            ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
-
-            #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
-            total_loss = loss_img(logits_per_image,ground_truth) 
-
-            # Convert similarity scores to predicted labels
-            predicted_label = index.cpu().numpy()
-            ground_truth_label = ground_truth.cpu().numpy()
-
-            # Append predicted labels and ground truth labels
-            all_preds.append(predicted_label)
-            all_labels.append(ground_truth_label)
-
-            # Append loss
-            val_losses.append(total_loss.item())
-
-            val_accuracy = accuracy_score(ground_truth_label, predicted_label)
-            print('Validation accuracy: ', val_accuracy)
-
-            val_precision = precision_score(ground_truth_label, predicted_label, average='binary')
-            print('Validation_precision: ', val_precision)
-  
-  # Calculate confusion matrix
-  conf_matrix = confusion_matrix(all_labels, all_preds)
-
-  # Print or visualize the confusion matrix
-  print("Confusion Matrix:")
-  print(conf_matrix)
+    # Print or visualize the confusion matrix
+    print("Confusion Matrix:")
+    print(conf_matrix)
 
 print('Start testing')
 def test_clip(dataset):
