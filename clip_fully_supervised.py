@@ -122,9 +122,9 @@ test_list_labels = [int(label) for label in test_data['label']]
 #Define class names in a list - it needs prompt engineering
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
-#class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
+class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
-class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
+#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
