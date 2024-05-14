@@ -191,12 +191,20 @@ scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader
 loss_img = nn.CrossEntropyLoss()
 loss_txt = nn.CrossEntropyLoss()
 
+best_te_loss = 1e5
+best_ep = -1
+
 # Model training
 print('starts training')
 for epoch in range(num_epochs):
+    print(f"running epoch {epoch}, best test loss {best_te_loss} after epoch {best_ep}")
+    step = 0
+    tr_loss = 0
     model.train()
     pbar = tqdm(train_dataloader, total=len(train_dataloader))
     for batch in pbar:
+        step += 1
+
         # Extract images and texts from the batch
         images, labels, true_label = batch 
 
@@ -242,6 +250,7 @@ for epoch in range(num_epochs):
 
         # Backward pass
         total_loss.backward()
+        tr_loss += total_loss.item()
         if device == "cpu":
             optimizer.step()
             scheduler.step()
@@ -253,9 +262,12 @@ for epoch in range(num_epochs):
             clip.model.convert_weights(model)
         # Update the progress bar with the current epoch and loss
         pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {total_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")
+    tr_loss /= step
 
     print('Validation loop starts...')
     model.eval()
+    step = 0
+    te_loss = 0
     val_losses = []
     val_accs = []
     all_preds = []
@@ -264,6 +276,7 @@ for epoch in range(num_epochs):
         vbar = tqdm(val_dataloader, total=len(val_dataloader))
         i = 0
         for batch in vbar:
+                step += 1
                 # Extract images and texts from the batch
                 images, labels, true_label = batch 
                 # Move images and texts to the specified device
@@ -289,6 +302,7 @@ for epoch in range(num_epochs):
 
                 #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
                 total_loss = loss_img(logits_per_image,ground_truth) 
+                te_loss += total_loss.item()
 
                 # Convert similarity scores to predicted labels
                 predicted_label = index.cpu().numpy()
@@ -316,7 +330,9 @@ for epoch in range(num_epochs):
                 # Update the progress bar with the current epoch and loss
                 vbar.set_description(f"Validation: {i}/{len(val_dataloader)}, Validation loss: {total_loss.item():.4f}")
                 i+=1
-    
+
+        te_loss /= step
+
     # Convert lists of arrays to numpy arrays
     all_labels_array = np.concatenate(all_labels)
     all_preds_array = np.concatenate(all_preds)
@@ -348,6 +364,12 @@ for epoch in range(num_epochs):
     print(f"Test Recall: {recall:.4f}")
     print(f"Test F1 Score: {f_score:.4f}")
 
+    if te_loss < best_te_loss:
+        best_te_loss = te_loss
+        best_ep = epoch
+        torch.save(model.state_dict(), "best_model.pt")
+    print(f"epoch {epoch}, tr_loss {tr_loss}, te_loss {te_loss}")
+torch.save(model.state_dict(), "last_model.pt")
 
 print('Start testing...')
 
@@ -360,7 +382,7 @@ test_labels = []
 with torch.no_grad():
         tbar = tqdm(test_dataloader, total=len(test_dataloader))
         i = 0
-        for batch in vbar:
+        for batch in tbar:
                 # Extract images and texts from the batch
                 images, labels, true_label = batch 
                 # Move images and texts to the specified device

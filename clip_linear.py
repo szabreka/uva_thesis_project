@@ -97,20 +97,25 @@ class ImageTitleDataset(Dataset):
     
 #Define training, validation and test data
 # Load the JSON metadata
-with open('data/datasets/oneshot_dataset.json', 'r') as f:
+with open('data/split/metadata_train_split_by_date.json', 'r') as f:
     train_data = json.load(f)
+with open('data/split/metadata_validation_split_by_date.json', 'r') as f:
+    val_data = json.load(f)
 with open('data/split/metadata_test_split_by_date.json', 'r') as f:
     test_data = json.load(f)
 
 
 # Convert the datasets to a Pandas DataFrame
 train_data = pd.DataFrame(train_data)
+val_data = pd.DataFrame(val_data)
 test_data = pd.DataFrame(test_data)
 
 
 # Prepare the list of video file paths and labels
 train_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in train_data['file_name']]
 train_list_labels = [int(label) for label in train_data['label']]
+val_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in val_data['file_name']]
+val_list_labels = [int(label) for label in val_data['label']]
 test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
 test_list_labels = [int(label) for label in test_data['label']]
 
@@ -151,183 +156,67 @@ test_transform = transforms.Compose([
 
 # Create dataset and data loader for training, validation and testing
 train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, class_names, train_transform)
+val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, class_names, val_transform)
 test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_names, test_transform)
 
 print('Datasets created')
 
 #Create dataloader fot training, validation and testig
 
-train_dataloader = DataLoader(train_dataset, batch_size=2, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
 
 print('Dataloaders created')
 
-# Function to convert model's parameters to FP32 format
-#This is done so that our model loads in the provided memory
-def convert_models_to_fp32(model): 
-    for p in model.parameters(): 
-        p.data = p.data.float() 
-        p.grad.data = p.grad.data.float() 
-
-# Check if the device is set to CPU
-if device == "cpu":
-  model.float()
-
-#Define number of epochs
-num_epochs = 1
-
-# Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
-
-# Specify the loss functions - for images and for texts
-loss_img = nn.CrossEntropyLoss()
-loss_txt = nn.CrossEntropyLoss()
-
-# Model training
-print('starts training')
-for epoch in range(num_epochs):
-    model.train()
-    pbar = tqdm(train_dataloader, total=len(train_dataloader))
-    for batch in pbar:
-        # Extract images and texts from the batch
-        images, labels, true_label = batch 
-
-        # Move images and texts to the specified device (CPU or GPU)
-        images= images.to(device)
-        texts = labels.to(device)
-        true_label = true_label.to(device)
-        text_inputs = clip.tokenize(class_names).to(device)
-
-        #Squeeze texts tensor to match the required size
-        texts = texts.squeeze(dim = 1)
-        text_inputs = text_inputs.squeeze(dim = 1)
-
-        # Forward pass - Run the model on the input data (images and texts)
-        logits_per_image, logits_per_text = model(images, text_inputs)
-
-        #Transform logits to float to match required dtype 
-        logits_per_image = logits_per_image.float()
-        logits_per_text = logits_per_text.float()
-
-        #Ground truth
-        ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
-
-        #Compute loss - contrastive loss to pull similar pairs closer together
-        #total_loss = (loss_img(logits_per_image,ground_truth) + loss_txt(logits_per_text.T,ground_truth))/2
-
-        #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
-        total_loss = loss_img(logits_per_image, ground_truth) 
-
-        # Get and convert similarity scores to predicted labels
-        similarity = logits_per_image.softmax(dim=-1)
-        value, index = similarity.topk(1)
-        
-        #Convert values to numpy
-        predicted_label = index.cpu().numpy()
-        ground_truth_label = ground_truth.cpu().numpy()
-        
-        train_accuracy = accuracy_score(ground_truth_label, predicted_label)
-        print('Train accuracy: ', train_accuracy)
-
-        # Zero out gradients for the optimizer (Adam) - to prevent adding gradients to previous ones
-        optimizer.zero_grad()
-
-        # Backward pass
-        total_loss.backward()
-        if device == "cpu":
-            optimizer.step()
-            scheduler.step()
-        else : 
-            # Convert model's parameters to FP32 format, update, and convert back
-            convert_models_to_fp32(model)
-            optimizer.step()
-            scheduler.step()
-            clip.model.convert_weights(model)
-        # Update the progress bar with the current epoch and loss
-        pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {total_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")
-
-print('Start testing...')
-
-
-model.eval()
-test_losses = []
-test_accs = []
-test_preds = []
-test_labels = []
-with torch.no_grad():
-        tbar = tqdm(test_dataloader, total=len(test_dataloader))
-        i = 0
-        for batch in tbar:
-                # Extract images and texts from the batch
-                images, labels, true_label = batch 
-                # Move images and texts to the specified device
-                images = images.to(device)
-                texts = labels.to(device)
-                true_label = true_label.to(device)
-                text_inputs = clip.tokenize(class_names).to(device)
-                texts = texts.squeeze(dim=1)
-                text_inputs.squeeze(dim=1)
-
-                # Forward pass
-                logits_per_image, logits_per_text = model(images, text_inputs)
-
-                #Transform logits to float to match required dtype 
-                logits_per_image = logits_per_image.float()
-                logits_per_text = logits_per_text.float()
-
-                # Get and convert similarity scores to predicted labels - values are the probabilities, indicies are the classes
-                similarity = logits_per_image.softmax(dim=-1)
-                value, index = similarity.topk(1)
-
-                ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
-
-                #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
-                total_loss = loss_img(logits_per_image,ground_truth) 
-
-                # Convert similarity scores to predicted labels
-                predicted_label = index.cpu().numpy()
-                ground_truth_label = ground_truth.cpu().numpy()
-
-                # Append predicted labels and ground truth labels
-                test_preds.append(predicted_label)
-                test_labels.append(ground_truth_label)
-
-                # Append loss
-                test_losses.append(total_loss.item())
-
-                # Update the progress bar with the current epoch and loss
-                tbar.set_description(f"Testing: {i}/{len(test_dataloader)}, Test loss: {total_loss.item():.4f}")
-                i+=1
+def get_features(dataloader):
+    all_features = []
+    all_labels = []
     
-# Convert lists of arrays to numpy arrays
-all_labels_array = np.concatenate(test_labels)
-all_preds_array = np.concatenate(test_preds)
+    with torch.no_grad():
+        for images, labels in dataloader:
+            features = model.encode_image(images.to(device))
 
-# Convert to 1D arrays
-all_labels_flat = all_labels_array.flatten()
-all_preds_flat = all_preds_array.flatten()
+            all_features.append(features)
+            all_labels.append(labels)
 
-# Ensure they are integers
-all_labels_int = all_labels_flat.astype(int)
-all_preds_int = all_preds_flat.astype(int)
+    return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy()
 
-# Calculate confusion matrix
-conf_matrix = confusion_matrix(all_labels_int, all_preds_int)
+# Calculate the image features
+train_features, train_labels = get_features(train_dataloader)
+val_features, val_labels = get_features(val_dataloader)
+test_features, test_labels = get_features(test_dataloader)
 
-# Print or visualize the confusion matrix
-print("Confusion Matrix:")
-print(conf_matrix)
+classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
 
-#get evaluation metrics:
+# Optionally, use early stopping based on the validation set performance
+# For example, if validation accuracy does not improve for several epochs, stop training
+best_val_accuracy =  0.001
+best_epoch = 0
+num_epochs = 10
+for epoch in range(num_epochs):
+    print(f"Epoch {epoch + 1}/{num_epochs}")
 
-precision = precision_score(all_labels_int, all_preds_int, average='binary')
-recall = recall_score(all_labels_int, all_preds_int, average='binary')
-f_score= f1_score(all_labels_int, all_preds_int, average='binary')
-acc = accuracy_score(all_labels_int, all_preds_int)
+    # Training
+    print('Training')
+    classifier.fit(train_features, train_labels)
 
-# Print or log the metrics
-print(f"Test Accuracy: {acc:.4f}")
-print(f"Test Precision: {precision:.4f}")
-print(f"Test Recall: {recall:.4f}")
-print(f"Test F1 Score: {f_score:.4f}")
+    # Validation
+    print('Validation')
+    val_predictions = classifier.predict(val_features)
+    val_accuracy = np.mean((val_labels == val_predictions).astype(float)) * 100.
+    
+    if val_accuracy > best_val_accuracy:
+        best_val_accuracy = val_accuracy
+        best_epoch = epoch
+    else:
+        break
+
+# Print the best validation accuracy and the corresponding epoch
+print(f"Best Validation Accuracy = {best_val_accuracy:.3f} at Epoch {best_epoch}")
+
+# Evaluate the trained classifier on the test set
+test_predictions = classifier.predict(test_features)
+test_accuracy = np.mean((test_labels == test_predictions).astype(float)) * 100.
+print(f"Test Accuracy = {test_accuracy:.3f}")
+
