@@ -174,7 +174,7 @@ def get_features(dataloader):
     all_labels = []
     
     with torch.no_grad():
-        for images, labels in dataloader:
+        for images, classes, labels  in dataloader:
             features = model.encode_image(images.to(device))
 
             all_features.append(features)
@@ -184,8 +184,11 @@ def get_features(dataloader):
 
 # Calculate the image features
 train_features, train_labels = get_features(train_dataloader)
+print('Train feaures created')
 val_features, val_labels = get_features(val_dataloader)
+print('Validation features created')
 test_features, test_labels = get_features(test_dataloader)
+print('Test features created')
 
 classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
 
@@ -193,7 +196,7 @@ classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=
 # For example, if validation accuracy does not improve for several epochs, stop training
 best_val_accuracy =  0.001
 best_epoch = 0
-num_epochs = 10
+num_epochs = 1
 for epoch in range(num_epochs):
     print(f"Epoch {epoch + 1}/{num_epochs}")
 
@@ -201,22 +204,54 @@ for epoch in range(num_epochs):
     print('Training')
     classifier.fit(train_features, train_labels)
 
+    train_predictions = classifier.predict(train_features)
+    train_accuracy = accuracy_score(train_labels, train_predictions)
+    train_precision = precision_score(train_labels, train_predictions)
+    train_recall = recall_score(train_labels, train_predictions)
+    train_f1 = f1_score(train_labels, train_predictions)
+
+    print(f"Train Accuracy = {train_accuracy:.3f}")
+    print(f"Train Precision = {train_precision:.3f}")
+    print(f"Train Recall = {train_recall:.3f}")
+    print(f"Train F1 Score = {train_f1:.3f}")
+
     # Validation
     print('Validation')
     val_predictions = classifier.predict(val_features)
-    val_accuracy = np.mean((val_labels == val_predictions).astype(float)) * 100.
+
+    val_accuracy = accuracy_score(val_labels, val_predictions)
+    val_precision = precision_score(val_labels, val_predictions)
+    val_recall = recall_score(val_labels, val_predictions)
+    val_f1 = f1_score(val_labels, val_predictions)
+
+    print(f"Validation Accuracy = {val_accuracy:.3f}")
+    print(f"Validation Precision = {val_precision:.3f}")
+    print(f"Validation Recall = {val_recall:.3f}")
+    print(f"Validation F1 Score = {val_f1:.3f}")
+    
     
     if val_accuracy > best_val_accuracy:
         best_val_accuracy = val_accuracy
         best_epoch = epoch
-    else:
-        break
+    #else:
+    #    break
 
 # Print the best validation accuracy and the corresponding epoch
 print(f"Best Validation Accuracy = {best_val_accuracy:.3f} at Epoch {best_epoch}")
 
 # Evaluate the trained classifier on the test set
 test_predictions = classifier.predict(test_features)
-test_accuracy = np.mean((test_labels == test_predictions).astype(float)) * 100.
-print(f"Test Accuracy = {test_accuracy:.3f}")
 
+test_accuracy = accuracy_score(test_labels, test_predictions)
+test_precision = precision_score(test_labels, test_predictions)
+test_recall = recall_score(test_labels, test_predictions)
+test_f1 = f1_score(test_labels, test_predictions)
+
+print(f"Test Accuracy = {test_accuracy:.3f}")
+print(f"Test Precision = {test_precision:.3f}")
+print(f"Test Recall = {test_recall:.3f}")
+print(f"Test F1 Score = {test_f1:.3f}")
+
+conf_matrix = confusion_matrix(test_labels, test_predictions)
+print("Confusion Matrix:")
+print(conf_matrix)

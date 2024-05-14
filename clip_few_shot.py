@@ -97,7 +97,7 @@ class ImageTitleDataset(Dataset):
     
 #Define training, validation and test data
 # Load the JSON metadata
-with open('data/datasets/oneshot_dataset.json', 'r') as f:
+with open('data/datasets/twoshot_dataset.json', 'r') as f:
     train_data = json.load(f)
 with open('data/split/metadata_test_split_by_date.json', 'r') as f:
     test_data = json.load(f)
@@ -157,7 +157,7 @@ print('Datasets created')
 
 #Create dataloader fot training, validation and testig
 
-train_dataloader = DataLoader(train_dataset, batch_size=2, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
 
 print('Dataloaders created')
