@@ -13,7 +13,7 @@ from torchvision.transforms import ToTensor
 import pandas as pd
 from PIL import Image
 import torch.nn as nn
-import torch.optim
+import torch.optim as optim
 import torchvision.transforms as transforms
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
@@ -161,10 +161,11 @@ test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_n
 
 print('Datasets created')
 
-#Create dataloader fot training and validation
+#Create dataloader fot training, validation and testig
 
 train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
 
 print('Dataloaders created')
 
@@ -179,15 +180,18 @@ def convert_models_to_fp32(model):
 if device == "cpu":
   model.float()
 
+#Define number of epochs
+num_epochs = 1
+
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=5e-7,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 # Specify the loss functions - for images and for texts
 loss_img = nn.CrossEntropyLoss()
 loss_txt = nn.CrossEntropyLoss()
 
 # Model training
-num_epochs = 1
 print('starts training')
 for epoch in range(num_epochs):
     model.train()
@@ -240,15 +244,17 @@ for epoch in range(num_epochs):
         total_loss.backward()
         if device == "cpu":
             optimizer.step()
+            scheduler.step()
         else : 
             # Convert model's parameters to FP32 format, update, and convert back
             convert_models_to_fp32(model)
             optimizer.step()
+            scheduler.step()
             clip.model.convert_weights(model)
         # Update the progress bar with the current epoch and loss
-        pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {total_loss.item():.4f}")
+        pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {total_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")
 
-    print('Validation loop starts')
+    print('Validation loop starts...')
     model.eval()
     val_losses = []
     val_accs = []
@@ -330,77 +336,100 @@ for epoch in range(num_epochs):
     print("Confusion Matrix:")
     print(conf_matrix)
 
+    #get evaluation metrics:
+
     precision = precision_score(all_labels_int, all_preds_int, average='binary')
-    print("Precision: ", precision)
-
     recall = recall_score(all_labels_int, all_preds_int, average='binary')
-    print('Recall: ', recall)
-
     f_score= f1_score(all_labels_int, all_preds_int, average='binary')
-    print('F-score: ', f_score)
-
     acc = accuracy_score(all_labels_int, all_preds_int)
-    print('Accuracy: ', acc)
 
-print('Start testing')
-def test_clip(dataset):
-    predicted_labels= []
-    ground_truths = []
-    # Loop over each image in dataloader
-    for rows in dataset:
-        
-        images, labels, true_label = rows
-
-        # Move images and texts to the specified device
-        images = images.unsqueeze(0).to(device)
-        texts = labels.to(device)
-        #true_label = true_label.to(device)
-        text_inputs = clip.tokenize(class_names).to(device)
-        texts = texts.squeeze(dim=1)
-        text_inputs.squeeze(dim=1)
-
-        # Calculate features
-        #with torch.no_grad():
-        #    image_features = model.encode_image(images)
-        #    text_features = model.encode_text(text_inputs)
-
-        # Calculate similarity
-        #image_features /= image_features.norm(dim=-1, keepdim=True)
-        #text_features /= text_features.norm(dim=-1, keepdim=True)
-        #similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
-        #print(similarity)
-
-        #It's the same as the similarity:
-        logits_per_image, logits_per_text = model(images, text_inputs)
-
-        similarity = logits_per_image.softmax(dim=-1)
-        value, index = similarity.topk(1)
-
-        ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
-
-        # Convert similarity scores to predicted labels
-        predicted_label = index.cpu().numpy()
-        ground_truth_label = ground_truth.cpu().numpy()
-
-        predicted_labels.append(predicted_label)
-        ground_truths.append(ground_truth_label)
-
-    # Compute accuracy
-    accuracy = accuracy_score(ground_truths, predicted_labels)
-
-    # Compute precision
-    precision = precision_score(ground_truths, predicted_labels, average='binary')
-
-    # Compute recall
-    recall = recall_score(ground_truths, predicted_labels, average='binary')
-
-    # Compute F1 score
-    f1 = f1_score(ground_truths, predicted_labels, average='binary')
-    
-    # Print or log the metrics
-    print(f"Test Accuracy: {accuracy:.4f}")
+    print(f"Test Accuracy: {acc:.4f}")
     print(f"Test Precision: {precision:.4f}")
     print(f"Test Recall: {recall:.4f}")
-    print(f"Test F1 Score: {f1:.4f}")
+    print(f"Test F1 Score: {f_score:.4f}")
 
-test_clip(test_dataset)
+
+print('Start testing...')
+
+
+model.eval()
+test_losses = []
+test_accs = []
+test_preds = []
+test_labels = []
+with torch.no_grad():
+        tbar = tqdm(test_dataloader, total=len(test_dataloader))
+        i = 0
+        for batch in vbar:
+                # Extract images and texts from the batch
+                images, labels, true_label = batch 
+                # Move images and texts to the specified device
+                images = images.to(device)
+                texts = labels.to(device)
+                true_label = true_label.to(device)
+                text_inputs = clip.tokenize(class_names).to(device)
+                texts = texts.squeeze(dim=1)
+                text_inputs.squeeze(dim=1)
+
+                # Forward pass
+                logits_per_image, logits_per_text = model(images, text_inputs)
+
+                #Transform logits to float to match required dtype 
+                logits_per_image = logits_per_image.float()
+                logits_per_text = logits_per_text.float()
+
+                # Get and convert similarity scores to predicted labels - values are the probabilities, indicies are the classes
+                similarity = logits_per_image.softmax(dim=-1)
+                value, index = similarity.topk(1)
+
+                ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
+
+                #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
+                total_loss = loss_img(logits_per_image,ground_truth) 
+
+                # Convert similarity scores to predicted labels
+                predicted_label = index.cpu().numpy()
+                ground_truth_label = ground_truth.cpu().numpy()
+
+                # Append predicted labels and ground truth labels
+                test_preds.append(predicted_label)
+                test_labels.append(ground_truth_label)
+
+                # Append loss
+                test_losses.append(total_loss.item())
+
+                # Update the progress bar with the current epoch and loss
+                tbar.set_description(f"Testing: {i}/{len(test_dataloader)}, Test loss: {total_loss.item():.4f}")
+                i+=1
+    
+# Convert lists of arrays to numpy arrays
+all_labels_array = np.concatenate(test_labels)
+all_preds_array = np.concatenate(test_preds)
+
+# Convert to 1D arrays
+all_labels_flat = all_labels_array.flatten()
+all_preds_flat = all_preds_array.flatten()
+
+# Ensure they are integers
+all_labels_int = all_labels_flat.astype(int)
+all_preds_int = all_preds_flat.astype(int)
+
+# Calculate confusion matrix
+conf_matrix = confusion_matrix(all_labels_int, all_preds_int)
+
+# Print or visualize the confusion matrix
+print("Confusion Matrix:")
+print(conf_matrix)
+
+#get evaluation metrics:
+
+precision = precision_score(all_labels_int, all_preds_int, average='binary')
+recall = recall_score(all_labels_int, all_preds_int, average='binary')
+f_score= f1_score(all_labels_int, all_preds_int, average='binary')
+acc = accuracy_score(all_labels_int, all_preds_int)
+
+# Print or log the metrics
+print(f"Test Accuracy: {acc:.4f}")
+print(f"Test Precision: {precision:.4f}")
+print(f"Test Recall: {recall:.4f}")
+print(f"Test F1 Score: {f_score:.4f}")
