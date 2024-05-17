@@ -359,10 +359,10 @@ for epoch in range(num_epochs):
     f_score= f1_score(all_labels_int, all_preds_int, average='binary')
     acc = accuracy_score(all_labels_int, all_preds_int)
 
-    print(f"Test Accuracy: {acc:.4f}")
-    print(f"Test Precision: {precision:.4f}")
-    print(f"Test Recall: {recall:.4f}")
-    print(f"Test F1 Score: {f_score:.4f}")
+    print(f"Validation Accuracy: {acc:.4f}")
+    print(f"Validation Precision: {precision:.4f}")
+    print(f"Validation Recall: {recall:.4f}")
+    print(f"Validation F1 Score: {f_score:.4f}")
 
     if te_loss < best_te_loss:
         best_te_loss = te_loss
