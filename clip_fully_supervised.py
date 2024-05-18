@@ -181,7 +181,7 @@ if device == "cpu":
   model.float()
 
 #Define number of epochs
-num_epochs = 5
+num_epochs = 20
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-6,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
@@ -367,9 +367,10 @@ for epoch in range(num_epochs):
     if te_loss < best_te_loss:
         best_te_loss = te_loss
         best_ep = epoch
-        torch.save(model.state_dict(), "best_model.pt")
+        #torch.save(model.state_dict(), "best_model.pt")
     print(f"epoch {epoch}, tr_loss {tr_loss}, te_loss {te_loss}")
-torch.save(model.state_dict(), "last_model.pt")
+print(f"best epoch {best_ep}, tr_loss {best_te_loss}")
+#torch.save(model.state_dict(), "last_model.pt")
 
 print('Start testing...')
 

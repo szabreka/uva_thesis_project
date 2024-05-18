@@ -17,6 +17,9 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.model_selection import GridSearchCV
 
 # Define device
 if torch.cuda.is_available():
@@ -169,78 +172,92 @@ test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
 
 print('Dataloaders created')
 
-def get_features(dataloader):
+def get_features(dataloader, name):
     all_features = []
     all_labels = []
     
     with torch.no_grad():
         for images, classes, labels  in dataloader:
             features = model.encode_image(images.to(device))
-
             all_features.append(features)
             all_labels.append(labels)
+    
+    features = torch.cat(all_features).cpu().numpy()
+    labels = torch.cat(all_labels).cpu().numpy()
+    
+    print(f"{name} Features Shape: {features.shape}")
+    print(f"{name} Labels Distribution: {np.bincount(labels)}")
+    return features, labels
 
-    return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy()
-
-# Calculate the image features
-train_features, train_labels = get_features(train_dataloader)
+train_features, train_labels = get_features(train_dataloader, 'Train')
 print('Train feaures created')
-val_features, val_labels = get_features(val_dataloader)
+val_features, val_labels = get_features(val_dataloader, 'Validation')
 print('Validation features created')
-test_features, test_labels = get_features(test_dataloader)
+test_features, test_labels = get_features(test_dataloader, 'Test')
 print('Test features created')
+
+def visualize_features(features, labels, title):
+    pca = PCA(n_components=2)
+    reduced_features = pca.fit_transform(features)
+    plt.figure(figsize=(10, 7))
+    plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
+    plt.colorbar()
+    plt.title(title)
+    plt.show()
+
+visualize_features(train_features, train_labels, 'Train Features')
+visualize_features(val_features, val_labels, 'Validation Features')
+visualize_features(test_features, test_labels, 'Test Features')
+
+param_grid = {
+    'penalty': ['none','l1','l2'],
+    'C': np.logspace(-4, -1, 50)
+}
 
 classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
 
-# Optionally, use early stopping based on the validation set performance
-# For example, if validation accuracy does not improve for several epochs, stop training
-best_val_accuracy =  0.001
-best_epoch = 0
-num_epochs = 1
-for epoch in range(num_epochs):
-    print(f"Epoch {epoch + 1}/{num_epochs}")
+grid_search = GridSearchCV(estimator=classifier, param_grid=param_grid, scoring = 'accuracy', cv=5, verbose=1, n_jobs=-1)
 
-    # Training
-    print('Training')
-    classifier.fit(train_features, train_labels)
+grid_search.fit(train_features, train_labels)
 
-    train_predictions = classifier.predict(train_features)
-    train_accuracy = accuracy_score(train_labels, train_predictions)
-    train_precision = precision_score(train_labels, train_predictions)
-    train_recall = recall_score(train_labels, train_predictions)
-    train_f1 = f1_score(train_labels, train_predictions)
+best_classifier = grid_search.best_estimator_
 
-    print(f"Train Accuracy = {train_accuracy:.3f}")
-    print(f"Train Precision = {train_precision:.3f}")
-    print(f"Train Recall = {train_recall:.3f}")
-    print(f"Train F1 Score = {train_f1:.3f}")
+print(f"Best C: {grid_search.best_params_['C']}, Best penalty: {grid_search.best_params_['penalty']}")
 
-    # Validation
-    print('Validation')
-    val_predictions = classifier.predict(val_features)
+'''
+# Training
+print('Training')
+classifier.fit(train_features, train_labels)
 
-    val_accuracy = accuracy_score(val_labels, val_predictions)
-    val_precision = precision_score(val_labels, val_predictions)
-    val_recall = recall_score(val_labels, val_predictions)
-    val_f1 = f1_score(val_labels, val_predictions)
+train_predictions = classifier.predict(train_features)
+train_accuracy = accuracy_score(train_labels, train_predictions)
+train_precision = precision_score(train_labels, train_predictions)
+train_recall = recall_score(train_labels, train_predictions)
+train_f1 = f1_score(train_labels, train_predictions)
 
-    print(f"Validation Accuracy = {val_accuracy:.3f}")
-    print(f"Validation Precision = {val_precision:.3f}")
-    print(f"Validation Recall = {val_recall:.3f}")
-    print(f"Validation F1 Score = {val_f1:.3f}")
-    
-    
-    if val_accuracy > best_val_accuracy:
-        best_val_accuracy = val_accuracy
-        best_epoch = epoch
-    #else:
-    #    break
+print(f"Train Accuracy = {train_accuracy:.3f}")
+print(f"Train Precision = {train_precision:.3f}")
+print(f"Train Recall = {train_recall:.3f}")
+print(f"Train F1 Score = {train_f1:.3f}")'''
 
-# Print the best validation accuracy and the corresponding epoch
-print(f"Best Validation Accuracy = {best_val_accuracy:.3f} at Epoch {best_epoch}")
+# Validation
+print('Validation')
+#val_predictions = classifier.predict(val_features)
+val_predictions = best_classifier.predict(val_features)
+
+val_accuracy = accuracy_score(val_labels, val_predictions)
+val_precision = precision_score(val_labels, val_predictions)
+val_recall = recall_score(val_labels, val_predictions)
+val_f1 = f1_score(val_labels, val_predictions)
+
+print(f"Validation Accuracy = {val_accuracy:.3f}")
+print(f"Validation Precision = {val_precision:.3f}")
+print(f"Validation Recall = {val_recall:.3f}")
+print(f"Validation F1 Score = {val_f1:.3f}")
 
 # Evaluate the trained classifier on the test set
-test_predictions = classifier.predict(test_features)
+#test_predictions = classifier.predict(test_features)
+test_predictions = best_classifier.predict(test_features)
 
 test_accuracy = accuracy_score(test_labels, test_predictions)
 test_precision = precision_score(test_labels, test_predictions)
