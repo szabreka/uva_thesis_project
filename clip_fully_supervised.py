@@ -130,7 +130,7 @@ class_names = ["a photo of factories with clear sky above chimney", "a photo of 
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
 #class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
 #class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
-#class_names = ['no smoke', 'smoke']
+#class_names = ['no smoke', 'smoke'] #-11
 
 # Define input resolution
 input_resolution = (224, 224)
@@ -163,9 +163,9 @@ print('Datasets created')
 
 #Create dataloader fot training, validation and testig
 
-train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
-test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False)
 
 print('Dataloaders created')
 
@@ -181,7 +181,7 @@ if device == "cpu":
   model.float()
 
 #Define number of epochs
-num_epochs = 20
+num_epochs = 5
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-6,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
