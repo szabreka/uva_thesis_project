@@ -122,12 +122,12 @@ test_list_labels = [int(label) for label in test_data['label']]
 #Define class names in a list - it needs prompt engineering
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
-class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
+#class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
 #class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
-#class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
+class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
 #class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
 #class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
 #class_names = ['no smoke', 'smoke'] #-11
@@ -181,7 +181,7 @@ if device == "cpu":
   model.float()
 
 #Define number of epochs
-num_epochs = 3
+num_epochs = 5
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-6,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
@@ -369,7 +369,7 @@ for epoch in range(num_epochs):
         best_ep = epoch
         torch.save(model.state_dict(), "../fs_best_model.pt")
     print(f"epoch {epoch}, tr_loss {tr_loss}, te_loss {te_loss}")
-print(f"best epoch {best_ep}, best te_loss {best_te_loss}")
+print(f"best epoch {best_ep+1}, best te_loss {best_te_loss}")
 torch.save(model.state_dict(), "../fs_last_model.pt")
 
 print('Start testing...')
