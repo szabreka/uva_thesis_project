@@ -97,7 +97,7 @@ class ImageTitleDataset(Dataset):
     
 #Define training, validation and test data
 # Load the JSON metadata
-with open('data/datasets/twoshot_dataset.json', 'r') as f:
+with open('data/datasets/oneshot_dataset.json', 'r') as f:
     train_data = json.load(f)
 with open('data/split/metadata_test_split_by_date.json', 'r') as f:
     test_data = json.load(f)

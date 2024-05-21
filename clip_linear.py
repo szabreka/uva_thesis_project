@@ -30,6 +30,9 @@ print('Used device: ', device)
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
+state_dict = torch.load('../fs_best_model.pt', map_location=device)
+model.load_state_dict(state_dict)
+
 # Load the dataset
 class ImageTitleDataset(Dataset):
     def __init__(self, list_video_path, list_labels, class_names, transform_image):
