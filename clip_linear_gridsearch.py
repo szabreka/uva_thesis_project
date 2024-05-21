@@ -224,22 +224,6 @@ best_classifier = grid_search.best_estimator_
 
 print(f"Best C: {grid_search.best_params_['C']}, Best penalty: {grid_search.best_params_['penalty']}")
 
-'''
-# Training
-print('Training')
-classifier.fit(train_features, train_labels)
-
-train_predictions = classifier.predict(train_features)
-train_accuracy = accuracy_score(train_labels, train_predictions)
-train_precision = precision_score(train_labels, train_predictions)
-train_recall = recall_score(train_labels, train_predictions)
-train_f1 = f1_score(train_labels, train_predictions)
-
-print(f"Train Accuracy = {train_accuracy:.3f}")
-print(f"Train Precision = {train_precision:.3f}")
-print(f"Train Recall = {train_recall:.3f}")
-print(f"Train F1 Score = {train_f1:.3f}")'''
-
 # Validation
 print('Validation')
 #val_predictions = classifier.predict(val_features)
