@@ -259,3 +259,6 @@ print(f"Test F1 Score = {test_f1:.3f}")
 conf_matrix = confusion_matrix(test_labels, test_predictions)
 print("Confusion Matrix:")
 print(conf_matrix)
+
+print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
+print("Classifier Model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in best_classifier.parameters()]):,}")

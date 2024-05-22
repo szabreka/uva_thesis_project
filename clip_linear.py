@@ -35,15 +35,13 @@ model.load_state_dict(state_dict)
 
 # Load the dataset
 class ImageTitleDataset(Dataset):
-    def __init__(self, list_video_path, list_labels, class_names, transform_image):
+    def __init__(self, list_video_path, list_labels, transform_image):
         #to handle the parent class
         super().__init__()
         #Initalize image paths and corresponding texts
         self.video_path = list_video_path
         #Initialize labels (0 or 1)
         self.labels = list_labels
-        #Initialize class names (no smoke or smoke)
-        self.class_names = class_names
         #Transform to tensor
         #self.transforms = ToTensor()
         self.transform_image = transform_image
@@ -94,9 +92,9 @@ class ImageTitleDataset(Dataset):
         #image = preprocess(image)
         #get the corresponding class names and tokenize
         true_label = self.labels[idx]
-        label = self.class_names[true_label]
-        label = clip.tokenize(label, context_length=77, truncate=True)
-        return image, label, true_label
+        #label = self.class_names[true_label]
+        #label = clip.tokenize(label, context_length=77, truncate=True)
+        return image, true_label
     
 #Define training, validation and test data
 # Load the JSON metadata
@@ -122,19 +120,6 @@ val_list_labels = [int(label) for label in val_data['label']]
 test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
 test_list_labels = [int(label) for label in test_data['label']]
 
-#Define class names in a list - it needs prompt engineering
-#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
-#class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
-class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
-#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
-#class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
-#class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
-#class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
-#class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
-#class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
-#class_names = ['no smoke', 'smoke']
-
 # Define input resolution
 input_resolution = (224, 224)
 
@@ -158,9 +143,9 @@ test_transform = transforms.Compose([
 ])
 
 # Create dataset and data loader for training, validation and testing
-train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, class_names, train_transform)
-val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, class_names, val_transform)
-test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_names, test_transform)
+train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, train_transform)
+val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, val_transform)
+test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, test_transform)
 
 print('Datasets created')
 
@@ -177,7 +162,7 @@ def get_features(dataloader):
     all_labels = []
     
     with torch.no_grad():
-        for images, classes, labels  in dataloader:
+        for images, labels  in dataloader:
             features = model.encode_image(images.to(device))
 
             all_features.append(features)
@@ -258,3 +243,6 @@ print(f"Test F1 Score = {test_f1:.3f}")
 conf_matrix = confusion_matrix(test_labels, test_predictions)
 print("Confusion Matrix:")
 print(conf_matrix)
+
+print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
+print("Classifier Model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in classifier.parameters()]):,}")
