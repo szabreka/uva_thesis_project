@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 from sklearn.metrics import confusion_matrix
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 
 # Define device
 if torch.cuda.is_available():
@@ -28,7 +28,7 @@ else:
 print('Used device: ', device)
 
 #Load CLIP model - ViT B32
-model, preprocess = clip.load('ViT-B/32', device, jit=False)
+model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
 # Load the dataset
 class ImageTitleDataset(Dataset):
@@ -458,3 +458,7 @@ print(f"Test Recall: {recall:.4f}")
 print(f"Test F1 Score: {f_score:.4f}")
 
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
+
+# Classification report
+target_names = ['class 0', 'class 1']
+print(classification_report(ground_truths, predicted_labels, target_names=target_names))

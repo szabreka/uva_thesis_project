@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 from sklearn.metrics import confusion_matrix
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.model_selection import GridSearchCV
@@ -259,6 +259,10 @@ print(f"Test F1 Score = {test_f1:.3f}")
 conf_matrix = confusion_matrix(test_labels, test_predictions)
 print("Confusion Matrix:")
 print(conf_matrix)
+
+# Classification report
+target_names = ['class 0', 'class 1']
+print(classification_report(ground_truths, predicted_labels, target_names=target_names))
 
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
 print("Classifier Model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in best_classifier.parameters()]):,}")
