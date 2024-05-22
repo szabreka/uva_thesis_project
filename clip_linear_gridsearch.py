@@ -213,7 +213,7 @@ visualize_features(val_features, val_labels, 'Validation Features')
 visualize_features(test_features, test_labels, 'Test Features')
 
 param_grid = {
-    'penalty': ['none','l1','l2'],
+    'penalty': ['None','l1','l2'],
     'C': np.logspace(-4, -0, 100)
 }
 
