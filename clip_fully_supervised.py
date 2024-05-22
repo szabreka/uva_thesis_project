@@ -461,4 +461,4 @@ print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.
 
 # Classification report
 target_names = ['class 0', 'class 1']
-print(classification_report(ground_truths, predicted_labels, target_names=target_names))
+print(classification_report(all_labels_int, all_preds_int , target_names=target_names))

@@ -262,7 +262,7 @@ print(conf_matrix)
 
 # Classification report
 target_names = ['class 0', 'class 1']
-print(classification_report(ground_truths, predicted_labels, target_names=target_names))
+print(classification_report(test_labels, test_predictions, target_names=target_names))
 
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
 print("Classifier Model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in best_classifier.parameters()]):,}")
