@@ -17,6 +17,8 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
+import matplotlib.pyplot as plt
+from datetime import datetime
 
 # Define device
 if torch.cuda.is_available():
@@ -136,28 +138,16 @@ class_names = ["a photo of factories with clear sky above chimney", "a photo of 
 input_resolution = (224, 224)
 
 # Define the transformation pipeline - from CLIP preprocessor without random crop augmentation
-train_transform = transforms.Compose([
-    transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
-    transforms.ToTensor(),
-    transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711])
-])
-
-val_transform = transforms.Compose([
-    transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
-    transforms.ToTensor(),
-    transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711])
-])
-
-test_transform = transforms.Compose([
+transform_steps = transforms.Compose([
     transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
     transforms.ToTensor(),
     transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711])
 ])
 
 # Create dataset and data loader for training, validation and testing
-train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, class_names, train_transform)
-val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, class_names, val_transform)
-test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_names, test_transform)
+train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, class_names, transform_steps)
+val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, class_names, transform_steps)
+test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_names, transform_steps)
 
 print('Datasets created')
 
@@ -184,7 +174,7 @@ if device == "cpu":
 num_epochs = 5
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-6,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 # Specify the loss functions - for images and for texts
@@ -193,6 +183,12 @@ loss_txt = nn.CrossEntropyLoss()
 
 best_te_loss = 1e5
 best_ep = -1
+early_stopping_counter = 0
+early_stopping_patience = 4
+train_accuracies = []
+val_accuracies = []
+train_losses = []
+val_losses = []
 
 # Model training
 print('starts training')
@@ -202,6 +198,8 @@ for epoch in range(num_epochs):
     tr_loss = 0
     model.train()
     pbar = tqdm(train_dataloader, total=len(train_dataloader))
+    epoch_train_correct = 0
+    epoch_train_total = 0
     for batch in pbar:
         step += 1
 
@@ -237,13 +235,15 @@ for epoch in range(num_epochs):
         # Get and convert similarity scores to predicted labels
         similarity = logits_per_image.softmax(dim=-1)
         value, index = similarity.topk(1)
+
+        correct = (index == ground_truth).sum().item()
+        total = labels.size(0)
+        epoch_train_correct += correct
+        epoch_train_total += total
         
         #Convert values to numpy
         predicted_label = index.cpu().numpy()
         ground_truth_label = ground_truth.cpu().numpy()
-        
-        train_accuracy = accuracy_score(ground_truth_label, predicted_label)
-        print('Train accuracy: ', train_accuracy)
 
         # Zero out gradients for the optimizer (Adam) - to prevent adding gradients to previous ones
         optimizer.zero_grad()
@@ -263,15 +263,19 @@ for epoch in range(num_epochs):
         # Update the progress bar with the current epoch and loss
         pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {total_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")
     tr_loss /= step
+    train_accuracy = epoch_train_correct / epoch_train_total
+    print('Training accuracy: ', train_accuracy)
+    train_losses.append(tr_loss)
+    train_accuracies.append(train_accuracy)
 
     print('Validation loop starts...')
     model.eval()
     step = 0
     te_loss = 0
-    val_losses = []
-    val_accs = []
     all_preds = []
     all_labels = []
+    epoch_val_correct = 0
+    epoch_val_total = 0
     with torch.no_grad():
         vbar = tqdm(val_dataloader, total=len(val_dataloader))
         i = 0
@@ -304,6 +308,11 @@ for epoch in range(num_epochs):
                 total_loss = loss_img(logits_per_image,ground_truth) 
                 te_loss += total_loss.item()
 
+                correct = (index == ground_truth).sum().item()
+                total = labels.size(0)
+                epoch_train_correct += correct
+                epoch_train_total += total
+
                 # Convert similarity scores to predicted labels
                 predicted_label = index.cpu().numpy()
                 ground_truth_label = ground_truth.cpu().numpy()
@@ -311,9 +320,6 @@ for epoch in range(num_epochs):
                 # Append predicted labels and ground truth labels
                 all_preds.append(predicted_label)
                 all_labels.append(ground_truth_label)
-
-                # Append loss
-                val_losses.append(total_loss.item())
 
                 val_accuracy = accuracy_score(ground_truth_label, predicted_label)
                 print('Validation accuracy per round: ', val_accuracy)
@@ -332,6 +338,9 @@ for epoch in range(num_epochs):
                 i+=1
 
         te_loss /= step
+        val_accuracy = epoch_val_correct / epoch_val_total
+        val_losses.append(te_loss)
+        val_accuracies.append(val_accuracy)
 
     # Convert lists of arrays to numpy arrays
     all_labels_array = np.concatenate(all_labels)
@@ -368,7 +377,16 @@ for epoch in range(num_epochs):
         best_te_loss = te_loss
         best_ep = epoch
         torch.save(model.state_dict(), "../fs_best_model.pt")
+        early_stopping_counter = 0
+    else:
+        early_stopping_counter += 1
+
     print(f"epoch {epoch}, tr_loss {tr_loss}, te_loss {te_loss}")
+
+    if early_stopping_counter >= early_stopping_patience:
+        print(f"Early stopping after {epoch + 1} epochs.")
+        break
+
 print(f"best epoch {best_ep+1}, best te_loss {best_te_loss}")
 torch.save(model.state_dict(), "../fs_last_model.pt")
 
@@ -376,8 +394,6 @@ print('Start testing...')
 
 
 model.eval()
-test_losses = []
-test_accs = []
 test_preds = []
 test_labels = []
 with torch.no_grad():
@@ -417,9 +433,6 @@ with torch.no_grad():
                 # Append predicted labels and ground truth labels
                 test_preds.append(predicted_label)
                 test_labels.append(ground_truth_label)
-
-                # Append loss
-                test_losses.append(total_loss.item())
 
                 # Update the progress bar with the current epoch and loss
                 tbar.set_description(f"Testing: {i}/{len(test_dataloader)}, Test loss: {total_loss.item():.4f}")
@@ -462,3 +475,23 @@ print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.
 # Classification report
 target_names = ['class 0', 'class 1']
 print(classification_report(all_labels_int, all_preds_int , target_names=target_names))
+
+# Plot the training and validation accuracy
+plt.figure(figsize=(10, 5))
+plt.plot(train_accuracies, label='Training Accuracy')
+plt.plot(val_accuracies, label='Validation Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.title('Training and Validation Accuracy')
+plt.show()
+
+# Plot the training and validation loss
+plt.figure(figsize=(10, 5))
+plt.plot(train_accuracies, label='Training Loss')
+plt.plot(val_accuracies, label='Validation Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+plt.title('Training and Validation Loss')
+plt.show()
