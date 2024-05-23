@@ -397,6 +397,7 @@ model.eval()
 test_preds = []
 test_labels = []
 with torch.no_grad():
+        start_time = datetime.now()
         tbar = tqdm(test_dataloader, total=len(test_dataloader))
         i = 0
         for batch in tbar:
@@ -437,6 +438,11 @@ with torch.no_grad():
                 # Update the progress bar with the current epoch and loss
                 tbar.set_description(f"Testing: {i}/{len(test_dataloader)}, Test loss: {total_loss.item():.4f}")
                 i+=1
+
+        end_time = datetime.now()
+        print('Start time: ', start_time)
+        print('Ending time: ', end_time)
+        print('Overall time: ', end_time-start_time)
     
 # Convert lists of arrays to numpy arrays
 all_labels_array = np.concatenate(test_labels)

@@ -195,7 +195,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 print('Dataloaders created')
 
-num_epochs = 30
+num_epochs = 50
 
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 loss = nn.CrossEntropyLoss()
