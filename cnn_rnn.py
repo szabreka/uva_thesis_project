@@ -196,12 +196,11 @@ test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 print('Dataloaders created')
 
 num_epochs = 50
-
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 loss = nn.CrossEntropyLoss()
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
-num_epochs = 1
+
 best_te_loss = 1e5
 best_ep = -1
 early_stopping_counter = 0
@@ -371,10 +370,10 @@ print(conf_matrix)
 
 #get evaluation metrics:
 
-precision = precision_score(all_labels, all_preds, average='binary')
-recall = recall_score(all_labels, all_preds, average='binary')
-f_score= f1_score(all_labels, all_preds, average='binary')
-acc = accuracy_score(all_labels, all_preds)
+precision = precision_score(test_labels, test_preds, average='binary')
+recall = recall_score(test_labels, test_preds, average='binary')
+f_score= f1_score(test_labels, test_preds, average='binary')
+acc = accuracy_score(test_labels, test_preds)
 
 # Print or log the metrics
 print(f"Test Accuracy: {acc:.4f}")
@@ -386,7 +385,7 @@ print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.
 
 # Classification report
 target_names = ['class 0', 'class 1']
-print(classification_report(all_labels, all_preds, target_names=target_names))
+print(classification_report(test_labels, test_preds, target_names=target_names))
 
 # Plot the training and validation accuracy
 plt.figure(figsize=(10, 5))
@@ -396,7 +395,8 @@ plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.legend()
 plt.title('Training and Validation Accuracy')
-plt.show()
+plt.savefig('training_validation_accuracy.png')
+plt.close()
 
 # Plot the training and validation loss
 plt.figure(figsize=(10, 5))
@@ -406,4 +406,5 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
 plt.title('Training and Validation Loss')
-plt.show()
+plt.savefig('training_validation_loss.png')
+plt.close()

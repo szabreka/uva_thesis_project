@@ -490,7 +490,9 @@ plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.legend()
 plt.title('Training and Validation Accuracy')
-plt.show()
+plt.savefig('training_validation_accuracy.png')
+plt.close()
+
 
 # Plot the training and validation loss
 plt.figure(figsize=(10, 5))
@@ -500,4 +502,5 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
 plt.title('Training and Validation Loss')
-plt.show()
+plt.savefig('training_validation_loss.png')
+plt.close()
