@@ -19,6 +19,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 import matplotlib.pyplot as plt
 from datetime import datetime
+from torch.nn.parallel import DataParallel
 
 # Define device
 if torch.cuda.is_available():
@@ -31,6 +32,9 @@ print('Used device: ', device)
 
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
+if torch.cuda.device_count() > 1:
+    print("Let's use", torch.cuda.device_count(), "GPUs!")
+    model = DataParallel(model)
 
 # Load the dataset
 class ImageTitleDataset(Dataset):
@@ -385,6 +389,7 @@ for epoch in range(num_epochs):
 
     if early_stopping_counter >= early_stopping_patience:
         print(f"Early stopping after {epoch + 1} epochs.")
+        torch.save(model.state_dict(), "../fs_last_model.pt")
         break
 
 print(f"best epoch {best_ep+1}, best te_loss {best_te_loss}")

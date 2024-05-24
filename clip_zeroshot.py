@@ -17,6 +17,11 @@ import torch.optim
 import torchvision.transforms as transforms
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
+import random
+import matplotlib.pyplot as plt
+from datetime import datetime
+
+start_time = datetime.now()
 
 # Define device
 if torch.cuda.is_available():
@@ -109,7 +114,7 @@ list_labels = [int(label) for label in test_data['label']]
 #Define class names in a list - it needs prompt engineering
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
-class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
+#class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
 #class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
@@ -118,7 +123,8 @@ class_names = ["a photo of factories with clear sky above chimney", "a photo of 
 #class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
 #class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
 #class_names = ['no smoke', 'smoke'] #11
-#class_names = ['a photo of an industrial facility, emitting no smoke', 'a photo of an industrial facility, emitting smoke']
+#class_names = ['a photo of an industrial facility, emitting no smoke', 'a photo of an industrial facility, emitting smoke'] #12
+class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #13
 
 # Define input resolution
 input_resolution = (224, 224)
@@ -198,3 +204,59 @@ def zs_clip(dataset):
     print(f"F1 Score: {f1:.4f}")
 
 zs_clip(dataset)
+
+end_time = datetime.now()
+print('Start time: ', start_time)
+print('Ending time: ', end_time)
+print('Overall time: ', end_time-start_time)
+
+#Visualize some results
+
+def visualize_random_images(dataset, num_images=9):
+    # Select random indices
+    random_indices = random.sample(range(len(dataset)), num_images)
+    
+    # Prepare plot
+    fig, axes = plt.subplots(3, 3, figsize=(20, 14))
+    axes = axes.flatten()
+    
+    # Prepare CLIP model and text inputs
+    model.eval()
+    text_inputs = clip.tokenize(class_names).to(device)
+    
+    with torch.no_grad():
+        for i, idx in enumerate(random_indices):
+            # Get image, label, and true label
+            image, label, true_label = dataset[idx]
+            image = image.unsqueeze(0).to(device)
+            texts = label.to(device)
+            texts = texts.squeeze(dim=1)
+            text_inputs.squeeze(dim=1)
+
+            # Calculate features
+            image_features = model.encode_image(image)
+            text_features = model.encode_text(text_inputs)
+
+            # Calculate similarity
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+            text_features /= text_features.norm(dim=-1, keepdim=True)
+            similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+
+            # Predicted label
+            predicted_label = similarity.argmax(dim=1).item()
+
+            # Display image and similarity scores
+            image_np = image.squeeze(0).permute(1, 2, 0).cpu().numpy()
+            image_np = (image_np * np.array([0.26862954, 0.26130258, 0.27577711]) + np.array([0.48145466, 0.4578275, 0.40821073])) * 255
+            image_np = image_np.astype(np.uint8)
+
+            axes[i].imshow(image_np)
+            axes[i].axis('off')
+            axes[i].set_title(f"True: {class_names[true_label]}\nPred: {class_names[predicted_label]}", fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig('zeroshot_examples.png')
+    plt.close()
+
+# Visualize random 9 images
+visualize_random_images(dataset)

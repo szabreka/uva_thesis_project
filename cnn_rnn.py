@@ -21,6 +21,7 @@ import torch.nn as nn
 from torchvision import models
 import matplotlib.pyplot as plt
 from datetime import datetime
+from torch.nn.parallel import DataParallel
 
 # Define device
 if torch.cuda.is_available():
@@ -31,15 +32,15 @@ else:
     device = torch.device("cpu") # use CPU device
 print('Used device: ', device)
 
-import torch
-import torch.nn as nn
-from torchvision import models
-
 class MobileNetV3Small_RNN(nn.Module):
     def __init__(self, num_classes, rnn_type="LSTM"):
         super(MobileNetV3Small_RNN, self).__init__()
         #load the model
         self.mobilenet = models.mobilenet_v3_small(pretrained=True)
+
+        #freeze the mobilenet parameters (not training these for efficiency)
+        for param in self.mobilenet.parameters():
+            param.requires_grad = False
 
         #extract features from final layer - pooling is exluded
         self.feature_extractor = self.mobilenet.features
@@ -88,6 +89,10 @@ class MobileNetV3Small_RNN(nn.Module):
 
 model = MobileNetV3Small_RNN(num_classes=2, rnn_type="LSTM")
 model = model.to(device)
+
+if torch.cuda.device_count() > 1:
+    print("Let's use", torch.cuda.device_count(), "GPUs!")
+    model = DataParallel(model)
 
 # Load the dataset
 class ImageTitleDataset(Dataset):
@@ -189,7 +194,7 @@ test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, val_tes
 
 print('Datasets created')
 
-train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
