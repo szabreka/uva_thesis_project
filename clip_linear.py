@@ -17,6 +17,7 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from datetime import datetime
 
 # Define device
 if torch.cuda.is_available():
@@ -62,7 +63,8 @@ class ImageTitleDataset(Dataset):
                 is_read, frame = video.read()
                 if not is_read:
                     break
-                frames.append(frame)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frames.append(frame_rgb)
             video.release()
         
         if len(frames) != 36:
@@ -227,6 +229,7 @@ for epoch in range(num_epochs):
 # Print the best validation accuracy and the corresponding epoch
 print(f"Best Validation Accuracy = {best_val_accuracy:.3f} at Epoch {best_epoch}")
 
+start_time = datetime.now()
 # Evaluate the trained classifier on the test set
 test_predictions = classifier.predict(test_features)
 
@@ -234,6 +237,11 @@ test_accuracy = accuracy_score(test_labels, test_predictions)
 test_precision = precision_score(test_labels, test_predictions)
 test_recall = recall_score(test_labels, test_predictions)
 test_f1 = f1_score(test_labels, test_predictions)
+
+end_time = datetime.now()
+print('Start time: ', start_time)
+print('Ending time: ', end_time)
+print('Overall time: ', end_time-start_time)
 
 print(f"Test Accuracy = {test_accuracy:.3f}")
 print(f"Test Precision = {test_precision:.3f}")

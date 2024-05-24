@@ -20,6 +20,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import matplotlib.pyplot as plt
 from datetime import datetime
 from torch.nn.parallel import DataParallel
+import random
 
 # Define device
 if torch.cuda.is_available():
@@ -67,7 +68,8 @@ class ImageTitleDataset(Dataset):
                 is_read, frame = video.read()
                 if not is_read:
                     break
-                frames.append(frame)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frames.append(frame_rgb)
             video.release()
         
         if len(frames) != 36:
@@ -509,3 +511,52 @@ plt.legend()
 plt.title('Training and Validation Loss')
 plt.savefig('training_validation_loss.png')
 plt.close()
+
+def visualize_random_images(dataset, num_images=9):
+    # Select random indices
+    random_indices = random.sample(range(len(dataset)), num_images)
+    
+    # Prepare plot
+    fig, axes = plt.subplots(3, 3, figsize=(20, 14))
+    axes = axes.flatten()
+    
+    # Prepare CLIP model and text inputs
+    model.eval()
+    text_inputs = clip.tokenize(class_names).to(device)
+    
+    with torch.no_grad():
+        for i, idx in enumerate(random_indices):
+            # Get image, label, and true label
+            image, label, true_label = dataset[idx]
+            image = image.unsqueeze(0).to(device)
+            texts = label.to(device)
+            texts = texts.squeeze(dim=1)
+            text_inputs.squeeze(dim=1)
+
+            # Calculate features
+            image_features = model.encode_image(image)
+            text_features = model.encode_text(text_inputs)
+
+            # Calculate similarity
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+            text_features /= text_features.norm(dim=-1, keepdim=True)
+            similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+
+            # Predicted label
+            predicted_label = similarity.argmax(dim=1).item()
+
+            # Display image and similarity scores
+            image_np = image.squeeze(0).permute(1, 2, 0).cpu().numpy()
+            image_np = (image_np * np.array([0.26862954, 0.26130258, 0.27577711]) + np.array([0.48145466, 0.4578275, 0.40821073])) * 255
+            image_np = image_np.astype(np.uint8)
+
+            axes[i].imshow(image_np)
+            axes[i].axis('off')
+            axes[i].set_title(f"True: {class_names[true_label]}\nPred: {class_names[predicted_label]}", fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig('fs_examples.png')
+    plt.close()
+
+# Visualize random 9 images
+visualize_random_images(test_dataset)

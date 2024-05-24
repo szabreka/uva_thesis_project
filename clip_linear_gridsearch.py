@@ -20,6 +20,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.model_selection import GridSearchCV
+from datetime import datetime
 
 # Define device
 if torch.cuda.is_available():
@@ -67,7 +68,8 @@ class ImageTitleDataset(Dataset):
                 is_read, frame = video.read()
                 if not is_read:
                     break
-                frames.append(frame)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frames.append(frame_rgb)
             video.release()
         
         if len(frames) != 36:
@@ -242,6 +244,7 @@ print(f"Validation Precision = {val_precision:.3f}")
 print(f"Validation Recall = {val_recall:.3f}")
 print(f"Validation F1 Score = {val_f1:.3f}")
 
+start_time = datetime.now()
 # Evaluate the trained classifier on the test set
 #test_predictions = classifier.predict(test_features)
 test_predictions = best_classifier.predict(test_features)
@@ -250,6 +253,11 @@ test_accuracy = accuracy_score(test_labels, test_predictions)
 test_precision = precision_score(test_labels, test_predictions)
 test_recall = recall_score(test_labels, test_predictions)
 test_f1 = f1_score(test_labels, test_predictions)
+
+end_time = datetime.now()
+print('Start time: ', start_time)
+print('Ending time: ', end_time)
+print('Overall time: ', end_time-start_time)
 
 print(f"Test Accuracy = {test_accuracy:.3f}")
 print(f"Test Precision = {test_precision:.3f}")
