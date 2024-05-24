@@ -65,7 +65,8 @@ class ImageTitleDataset(Dataset):
                 is_read, frame = video.read()
                 if not is_read:
                     break
-                frames.append(frame)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frames.append(frame_rgb)
             video.release()
         
         if len(frames) != 36:
