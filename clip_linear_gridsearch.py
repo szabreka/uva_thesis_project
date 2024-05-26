@@ -34,8 +34,8 @@ print('Used device: ', device)
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
-#state_dict = torch.load('../clip_fully_supervised_out/fs_best_model_3e_3p.pt', map_location=device)
-#model.load_state_dict(state_dict)
+state_dict = torch.load('../clip_fully_supervised_out/fs_best_model_3e_3p.pt', map_location=device)
+model.load_state_dict(state_dict)
 
 # Load the dataset
 class ImageTitleDataset(Dataset):

@@ -209,8 +209,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_wor
 print('Dataloaders created')
 
 num_epochs = 50
-#optimizer = torch.optim.Adam(model.parameters(), lr=5e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-optimizer = torch.optim.Adam(lr=1e-5, decay=1e-6)
+optimizer = torch.optim.Adam(model.parameters(), lr=5e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=1e-6)
 loss = nn.CrossEntropyLoss()
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
