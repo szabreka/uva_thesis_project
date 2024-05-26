@@ -232,6 +232,8 @@ for epoch in range(num_epochs):
         #Ground truth
         ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
 
+        print("ground truth: ",ground_truth)
+
         #Compute loss - contrastive loss to pull similar pairs closer together
         #total_loss = (loss_img(logits_per_image,ground_truth) + loss_txt(logits_per_text.T,ground_truth))/2
 
