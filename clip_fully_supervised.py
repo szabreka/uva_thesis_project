@@ -180,8 +180,8 @@ if device == "cpu":
 num_epochs = 5
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+#scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 # Specify the loss functions - for images and for texts
 loss_img = nn.CrossEntropyLoss()
@@ -259,12 +259,12 @@ for epoch in range(num_epochs):
         tr_loss += total_loss.item()
         if device == "cpu":
             optimizer.step()
-            scheduler.step()
+            #scheduler.step()
         else : 
             # Convert model's parameters to FP32 format, update, and convert back
             convert_models_to_fp32(model)
             optimizer.step()
-            scheduler.step()
+            #scheduler.step()
             clip.model.convert_weights(model)
         # Update the progress bar with the current epoch and loss
         pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {total_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")

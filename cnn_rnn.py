@@ -22,6 +22,8 @@ from torchvision import models
 import matplotlib.pyplot as plt
 from datetime import datetime
 from torch.nn.parallel import DataParallel
+from torchvision.io import read_video
+
 
 # Define device
 if torch.cuda.is_available():
@@ -40,7 +42,7 @@ class MobileNetV3Small_RNN(nn.Module):
 
         #freeze the mobilenet parameters (not training these for efficiency)
         for param in self.mobilenet.parameters():
-            param.requires_grad = False
+            param.requires_grad = True
 
         #extract features from final layer - pooling is exluded
         self.feature_extractor = self.mobilenet.features
@@ -132,13 +134,18 @@ class ImageTitleDataset(Dataset):
         
         return frames
 
+    def preprocess_videos(self, video_path):
+        # Use torchvision's read_video function
+        frames, _, _ = read_video(video_path)
+        return frames
+
     def __len__(self):
         return len(self.labels)
 
     def __getitem__(self, idx):
         #tranform videos into images and preprocess with defined transform function
         video_path = self.video_path[idx]
-        frames = self.preprocess_video_to_a_set_of_images(video_path)
+        frames = self.preprocess_videos(video_path)
         frames = [self.transform_image(Image.fromarray(frame)) for frame in frames]
         frames = torch.stack(frames)
 
@@ -195,16 +202,17 @@ test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, val_tes
 
 print('Datasets created')
 
-train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True)
+val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
+test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
 
 print('Dataloaders created')
 
 num_epochs = 50
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+#optimizer = torch.optim.Adam(model.parameters(), lr=5e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+optimizer = torch.optim.Adam(lr=1e-5, decay=1e-6)
 loss = nn.CrossEntropyLoss()
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+#scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 
 best_te_loss = 1e5
