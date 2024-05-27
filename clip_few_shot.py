@@ -100,7 +100,7 @@ class ImageTitleDataset(Dataset):
     
 #Define training, validation and test data
 # Load the JSON metadata
-with open('data/datasets/oneshot_dataset.json', 'r') as f:
+with open('data/datasets/twoshot_dataset.json', 'r') as f:
     train_data = json.load(f)
 with open('data/split/metadata_test_split_by_date.json', 'r') as f:
     test_data = json.load(f)
@@ -121,14 +121,14 @@ test_list_labels = [int(label) for label in test_data['label']]
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
+class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
 #class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
 #class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
 #class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
-class_names = ['no smoke', 'smoke']
+#class_names = ['no smoke', 'smoke']
 
 # Define input resolution
 input_resolution = (224, 224)
@@ -340,7 +340,7 @@ def get_features(dataloader):
     all_labels = []
     
     with torch.no_grad():
-        for images, labels  in dataloader:
+        for images, class_names, labels  in dataloader:
             features = model.encode_image(images.to(device))
 
             all_features.append(features)
@@ -358,7 +358,7 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('clip_oneshot_features.png')
+    plt.savefig('clip_twoshot_features.png')
     plt.close()
 
 visualize_features(test_features, test_labels, 'Test Features')
