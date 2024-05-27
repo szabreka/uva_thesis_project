@@ -55,8 +55,10 @@ class MobileNetV3Small_RNN(nn.Module):
 
         #room for rnn type choice: LSTM or GRU
         if rnn_type == "LSTM":
+            #batch first to signal (B,C,F) format
             self.rnn = nn.LSTM(self.num_features, hidden_size=256, num_layers=1, batch_first=True)
         elif rnn_type == "GRU":
+            #batch first to signal (B,C,F) format
             self.rnn = nn.GRU(self.num_features, hidden_size=256, num_layers=1, batch_first=True)
         else:
             raise ValueError("Invalid RNN type. Choose 'LSTM' or 'GRU'.")
@@ -89,7 +91,8 @@ class MobileNetV3Small_RNN(nn.Module):
         return logits
 
 
-model = MobileNetV3Small_RNN(num_classes=2, rnn_type="LSTM")
+model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
+print('RNN: ', model.rnn_type)
 model = model.to(device)
 
 if torch.cuda.device_count() > 1:
@@ -134,18 +137,13 @@ class ImageTitleDataset(Dataset):
         
         return frames
 
-    def preprocess_videos(self, video_path):
-        # Use torchvision's read_video function
-        frames, _, _ = read_video(video_path)
-        return frames
-
     def __len__(self):
         return len(self.labels)
 
     def __getitem__(self, idx):
         #tranform videos into images and preprocess with defined transform function
         video_path = self.video_path[idx]
-        frames = self.preprocess_videos(video_path)
+        frames = self.preprocess_video_to_a_set_of_images(video_path)
         frames = [self.transform_image(Image.fromarray(frame)) for frame in frames]
         frames = torch.stack(frames)
 
@@ -179,7 +177,7 @@ test_list_labels = [int(label) for label in test_data['label']]
 # Define input resolution
 input_resolution = (256, 256)
 
-# Define the transformation pipeline - from CLIP preprocessor without random crop augmentation
+# Define the transformation pipeline - from CLIP preprocessor without random crop augmentation, with extra data augmentation steps from RISE
 train_transform = transforms.Compose([
     transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
     transforms.RandomHorizontalFlip(p=0.3),

@@ -17,6 +17,8 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
 
 # Define device
 if torch.cuda.is_available():
@@ -61,7 +63,8 @@ class ImageTitleDataset(Dataset):
                 is_read, frame = video.read()
                 if not is_read:
                     break
-                frames.append(frame)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frames.append(frame_rgb)
             video.release()
         
         if len(frames) != 36:
@@ -117,15 +120,15 @@ test_list_labels = [int(label) for label in test_data['label']]
 #Define class names in a list - it needs prompt engineering
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
-class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
+#class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
+#class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
 #class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
 #class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
 #class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
-#class_names = ['no smoke', 'smoke']
+class_names = ['no smoke', 'smoke']
 
 # Define input resolution
 input_resolution = (224, 224)
@@ -178,7 +181,7 @@ num_epochs = 1
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+#scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 # Specify the loss functions - for images and for texts
 loss_img = nn.CrossEntropyLoss()
@@ -237,12 +240,12 @@ for epoch in range(num_epochs):
         total_loss.backward()
         if device == "cpu":
             optimizer.step()
-            scheduler.step()
+            #scheduler.step()
         else : 
             # Convert model's parameters to FP32 format, update, and convert back
             convert_models_to_fp32(model)
             optimizer.step()
-            scheduler.step()
+            #scheduler.step()
             clip.model.convert_weights(model)
         # Update the progress bar with the current epoch and loss
         pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {total_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")
@@ -331,3 +334,31 @@ print(f"Test Accuracy: {acc:.4f}")
 print(f"Test Precision: {precision:.4f}")
 print(f"Test Recall: {recall:.4f}")
 print(f"Test F1 Score: {f_score:.4f}")
+
+def get_features(dataloader):
+    all_features = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for images, labels  in dataloader:
+            features = model.encode_image(images.to(device))
+
+            all_features.append(features)
+            all_labels.append(labels)
+
+    return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy()
+
+test_features, test_labels = get_features(test_dataloader)
+print('Test features created')
+
+def visualize_features(features, labels, title):
+    pca = PCA(n_components=2)
+    reduced_features = pca.fit_transform(features)
+    plt.figure(figsize=(10, 7))
+    plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
+    plt.colorbar()
+    plt.title(title)
+    plt.savefig('clip_oneshot_features.png')
+    plt.close()
+
+visualize_features(test_features, test_labels, 'Test Features')

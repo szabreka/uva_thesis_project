@@ -33,9 +33,9 @@ print('Used device: ', device)
 
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
-if torch.cuda.device_count() > 1:
+'''if torch.cuda.device_count() > 1:
     print("Let's use", torch.cuda.device_count(), "GPUs!")
-    model = DataParallel(model)
+    model = DataParallel(model)'''
 
 # Load the dataset
 class ImageTitleDataset(Dataset):
@@ -159,8 +159,8 @@ print('Datasets created')
 
 #Create dataloader fot training, validation and testig
 
-train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 print('Dataloaders created')
@@ -190,7 +190,8 @@ loss_txt = nn.CrossEntropyLoss()
 best_te_loss = 1e5
 best_ep = -1
 early_stopping_counter = 0
-early_stopping_patience = 4
+early_stopping_patience = 3
+early_stopping_threshold = 0.03
 train_accuracies = []
 val_accuracies = []
 train_losses = []
@@ -391,7 +392,7 @@ for epoch in range(num_epochs):
 
     print(f"epoch {epoch}, tr_loss {tr_loss}, te_loss {te_loss}")
 
-    if early_stopping_counter >= early_stopping_patience:
+    if (early_stopping_counter >= early_stopping_patience) or (best_te_loss<=early_stopping_threshold):
         print(f"Early stopping after {epoch + 1} epochs.")
         torch.save(model.state_dict(), "../fs_last_model.pt")
         break
@@ -561,4 +562,4 @@ def visualize_random_images(dataset, num_images=9):
     plt.close()
 
 # Visualize random 9 images
-visualize_random_images(test_dataset)
+#visualize_random_images(test_dataset)

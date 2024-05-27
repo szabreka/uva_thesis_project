@@ -18,6 +18,8 @@ import torchvision.transforms as transforms
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from datetime import datetime
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
 
 # Define device
 if torch.cuda.is_available():
@@ -179,6 +181,18 @@ val_features, val_labels = get_features(val_dataloader)
 print('Validation features created')
 test_features, test_labels = get_features(test_dataloader)
 print('Test features created')
+
+def visualize_features(features, labels, title):
+    pca = PCA(n_components=2)
+    reduced_features = pca.fit_transform(features)
+    plt.figure(figsize=(10, 7))
+    plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
+    plt.colorbar()
+    plt.title(title)
+    plt.savefig('clip_features.png')
+    plt.close()
+
+#visualize_features(train_features, train_labels, 'Train Features')
 
 classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
 

@@ -34,8 +34,8 @@ print('Used device: ', device)
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
-state_dict = torch.load('../clip_fully_supervised_out/fs_best_model_3e_3p.pt', map_location=device)
-model.load_state_dict(state_dict)
+#state_dict = torch.load('../clip_fully_supervised_out/fs_best_model_3e_3p.pt', map_location=device)
+#model.load_state_dict(state_dict)
 
 # Load the dataset
 class ImageTitleDataset(Dataset):
@@ -171,9 +171,9 @@ print('Datasets created')
 
 #Create dataloader fot training, validation and testig
 
-train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
-test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 print('Dataloaders created')
 
@@ -212,11 +212,9 @@ def visualize_features(features, labels, title):
     plt.close()
 
 visualize_features(train_features, train_labels, 'Train Features')
-visualize_features(val_features, val_labels, 'Validation Features')
-visualize_features(test_features, test_labels, 'Test Features')
 
 param_grid = {
-    'penalty': ['None','l1','l2'],
+    'penalty': ['none','l1','l2'],
     'C': np.logspace(-3, 3, 100)
 }
 
