@@ -319,8 +319,8 @@ for epoch in range(num_epochs):
 
                 correct = (index == ground_truth).sum().item()
                 total = labels.size(0)
-                epoch_train_correct += correct
-                epoch_train_total += total
+                epoch_val_correct += correct
+                epoch_val_total += total
 
                 # Convert similarity scores to predicted labels
                 predicted_label = index.cpu().numpy()

@@ -92,7 +92,6 @@ class MobileNetV3Small_RNN(nn.Module):
 
 
 model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
-print('RNN: ', model.rnn_type)
 model = model.to(device)
 
 if torch.cuda.device_count() > 1:
