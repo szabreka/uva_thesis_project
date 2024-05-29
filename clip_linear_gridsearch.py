@@ -34,8 +34,8 @@ print('Used device: ', device)
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
-#state_dict = torch.load('../clip_fully_supervised/fs_last_model_11e_4p.pt', map_location=device)
-#model.load_state_dict(state_dict)
+state_dict = torch.load('../clip_fully_supervised/fs_best_model_11e_4p.pt', map_location=device)
+model.load_state_dict(state_dict)
 
 # Load the dataset
 class ImageTitleDataset(Dataset):
@@ -208,10 +208,10 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('zeroshot_examples.png')
+    plt.savefig('11e_4p_best_features_examples.png')
     plt.close()
 
-#visualize_features(train_features, train_labels, 'Train Features')
+visualize_features(test_features, test_labels, 'Test Features')
 
 param_grid = {
     'penalty': ['none','l1','l2'],
