@@ -33,7 +33,7 @@ print('Used device: ', device)
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
-state_dict = torch.load('../clip_fully_supervised_out/fs_best_model_3e_3p.pt', map_location=device)
+state_dict = torch.load('../fs_best_model.pt', map_location=device)
 model.load_state_dict(state_dict)
 
 # Load the dataset
@@ -189,10 +189,10 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('clip_features.png')
+    plt.savefig('clip_features_linear.png')
     plt.close()
 
-#visualize_features(train_features, train_labels, 'Train Features')
+visualize_features(test_features, test_labels, 'Test Features')
 
 classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
 
@@ -267,4 +267,4 @@ print("Confusion Matrix:")
 print(conf_matrix)
 
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
-print("Classifier Model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in classifier.parameters()]):,}")
+#print("Classifier Model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in classifier.parameters()]):,}")

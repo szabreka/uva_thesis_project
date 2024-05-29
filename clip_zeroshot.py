@@ -23,13 +23,16 @@ from datetime import datetime
 
 start_time = datetime.now()
 
-# Define device
+'''# Define device
 if torch.cuda.is_available():
     device = torch.device("cuda") # use CUDA device
 #elif torch.backends.mps.is_available():
 #    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
 else:
-    device = torch.device("cpu") # use CPU device
+    device = torch.device("cpu") # use CPU device'''
+
+device = torch.device("cpu") # use CPU device
+print(device)
 
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
@@ -116,7 +119,7 @@ list_labels = [int(label) for label in test_data['label']]
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emitting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
+class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
 #class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequential photo of an industrial plant with clear sky above chimney, created from a video", "a sequential photo of an industrial plant emitting smoke from chimney, created from a video"]# - 7
@@ -124,7 +127,7 @@ list_labels = [int(label) for label in test_data['label']]
 #class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
 #class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
 #class_names = ['no smoke', 'smoke'] #11
-class_names = ['a photo of an industrial facility, emitting no smoke', 'a photo of an industrial facility, emitting smoke'] #12
+#class_names = ['a photo of an industrial facility, emitting no smoke', 'a photo of an industrial facility, emitting smoke'] #12
 
 # Define input resolution
 input_resolution = (224, 224)
@@ -259,4 +262,4 @@ def visualize_random_images(dataset, num_images=9):
     plt.close()
 
 # Visualize random 9 images
-visualize_random_images(dataset)
+#visualize_random_images(dataset)
