@@ -42,7 +42,7 @@ class MobileNetV3Small_RNN(nn.Module):
 
         #freeze the mobilenet parameters (not training these for efficiency)
         for param in self.mobilenet.parameters():
-            param.requires_grad = False
+            param.requires_grad = True
 
         #extract features from final layer - pooling is exluded
         self.feature_extractor = self.mobilenet.features
@@ -90,9 +90,15 @@ class MobileNetV3Small_RNN(nn.Module):
         
         return logits
     
-model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
+model = MobileNetV3Small_RNN(num_classes=2, rnn_type="LSTM")
 model = model.to(device)
-state_dict = torch.load('../cnn_rnn/light_cnn_last_model_gru_11e.pt', map_location=device)
+state_dict = torch.load('../cnn_rnn/light_cnn_last_model_lstm_13e.pt', map_location=device)
+print("Pretrained Dict Keys:")
+for key in state_dict.keys():
+    print(key)
+#state_dict = torch.load('../cnn_rnn/light_cnn_last_model_gru_11e.pt', map_location=device)
+state_dict = {k.partition('module.')[2] if k.startswith('module.') else k: v for k, v in state_dict.items()}
+
 model.load_state_dict(state_dict)
 
 if torch.cuda.device_count() > 1:

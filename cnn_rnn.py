@@ -42,7 +42,7 @@ class MobileNetV3Small_RNN(nn.Module):
 
         #freeze the mobilenet parameters (not training these for efficiency)
         for param in self.mobilenet.parameters():
-            param.requires_grad = False
+            param.requires_grad = True
 
         #extract features from final layer - pooling is exluded
         self.feature_extractor = self.mobilenet.features
@@ -206,15 +206,18 @@ test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_wor
 print('Dataloaders created')
 
 num_epochs = 50
-optimizer = torch.optim.Adam(model.parameters(), lr=5e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=1e-6)
+#optimizer: first trainings:
+#optimizer = torch.optim.Adam(model.parameters(), lr=5e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=1e-6)
+#optimizer: second trainings:
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 loss = nn.CrossEntropyLoss()
-#scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 
 best_te_loss = 1e5
 best_ep = -1
 early_stopping_counter = 0
-early_stopping_patience = 4
+early_stopping_patience = 5
 train_accuracies = []
 val_accuracies = []
 train_losses = []
@@ -253,7 +256,7 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         batch_loss.backward()
         optimizer.step()
-        #scheduler.step()
+        scheduler.step()
         pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {batch_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")
     tr_loss /= step
     train_accuracy = epoch_train_correct / epoch_train_total

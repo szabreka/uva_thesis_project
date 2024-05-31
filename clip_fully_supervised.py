@@ -33,7 +33,7 @@ else:
 print('Used device: ', device)
 
 #Load CLIP model - ViT B32
-model, preprocess = clip.load('ViT-B/32', device, jit=False)
+model, preprocess = clip.load('ViT-B/16', device, jit=False)
 '''if torch.cuda.device_count() > 1:
     print("Let's use", torch.cuda.device_count(), "GPUs!")
     model = DataParallel(model)'''
@@ -132,8 +132,8 @@ test_list_labels = [int(label) for label in test_data['label']]
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
-#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
+#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
+class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
@@ -178,11 +178,11 @@ if device == "cpu":
   model.float()
 
 #Define number of epochs
-num_epochs = 20
+num_epochs = 25
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-#scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 # Specify the loss functions - for images and for texts
 loss_img = nn.CrossEntropyLoss()
@@ -191,7 +191,7 @@ loss_txt = nn.CrossEntropyLoss()
 best_te_loss = 1e5
 best_ep = -1
 early_stopping_counter = 0
-early_stopping_patience = 5
+early_stopping_patience = 25
 early_stopping_threshold = 0.03
 train_accuracies = []
 val_accuracies = []
@@ -507,8 +507,8 @@ plt.close()
 
 # Plot the training and validation loss
 plt.figure(figsize=(10, 5))
-plt.plot(train_accuracies, label='Training Loss')
-plt.plot(val_accuracies, label='Validation Loss')
+plt.plot(train_losses, label='Training Loss')
+plt.plot(val_losses, label='Validation Loss')
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
@@ -578,8 +578,8 @@ def get_features(dataloader):
 
     return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy()
 
-test_features, test_labels = get_features(test_dataloader)
-print('Test features created')
+#test_features, test_labels = get_features(test_dataloader)
+#print('Test features created')
 
 def visualize_features(features, labels, title):
     pca = PCA(n_components=2)
@@ -591,4 +591,4 @@ def visualize_features(features, labels, title):
     plt.savefig('clip_fullysupervised_features.png')
     plt.close()
 
-visualize_features(test_features, test_labels, 'Test Features')
+#visualize_features(test_features, test_labels, 'Test Features')
