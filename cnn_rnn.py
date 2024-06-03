@@ -23,6 +23,8 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from torch.nn.parallel import DataParallel
 from torchvision.io import read_video
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
 
 
 # Define device
@@ -209,9 +211,10 @@ num_epochs = 50
 #optimizer: first trainings:
 #optimizer = torch.optim.Adam(model.parameters(), lr=5e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=1e-6)
 #optimizer: second trainings:
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
 loss = nn.CrossEntropyLoss()
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
+#scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 
 best_te_loss = 1e5
@@ -256,7 +259,7 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         batch_loss.backward()
         optimizer.step()
-        scheduler.step()
+        #scheduler.step()
         pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {batch_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")
     tr_loss /= step
     train_accuracy = epoch_train_correct / epoch_train_total
@@ -308,6 +311,8 @@ for epoch in range(num_epochs):
         val_losses.append(te_loss)
         val_accuracies.append(val_accuracy)
         train_losses.append(te_loss)
+    
+    scheduler.step(te_loss)
 
     # Calculate confusion matrix
     conf_matrix = confusion_matrix(all_labels, all_preds)
@@ -408,16 +413,16 @@ plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.legend()
 plt.title('Training and Validation Accuracy')
-plt.savefig('training_validation_accuracy_cnn.png')
+plt.savefig('training_validation_accuracy_cnn_reducelr.png')
 plt.close()
 
 # Plot the training and validation loss
 plt.figure(figsize=(10, 5))
-plt.plot(train_accuracies, label='Training Loss')
-plt.plot(val_accuracies, label='Validation Loss')
+plt.plot(train_losses, label='Training Loss')
+plt.plot(val_losses, label='Validation Loss')
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
 plt.title('Training and Validation Loss')
-plt.savefig('training_validation_loss_cnn.png')
+plt.savefig('training_validation_loss_cnn_reducelr.png')
 plt.close()

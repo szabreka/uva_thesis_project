@@ -93,9 +93,9 @@ class MobileNetV3Small_RNN(nn.Module):
 model = MobileNetV3Small_RNN(num_classes=2, rnn_type="LSTM")
 model = model.to(device)
 state_dict = torch.load('../cnn_rnn/light_cnn_last_model_lstm_13e.pt', map_location=device)
-print("Pretrained Dict Keys:")
+'''print("Pretrained Dict Keys:")
 for key in state_dict.keys():
-    print(key)
+    print(key)'''
 #state_dict = torch.load('../cnn_rnn/light_cnn_last_model_gru_11e.pt', map_location=device)
 state_dict = {k.partition('module.')[2] if k.startswith('module.') else k: v for k, v in state_dict.items()}
 

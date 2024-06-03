@@ -33,7 +33,7 @@ print('Used device: ', device)
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
-state_dict = torch.load('../fs_best_model.pt', map_location=device)
+state_dict = torch.load('../fs_best_model_30.pt', map_location=device)
 model.load_state_dict(state_dict)
 
 # Load the dataset
@@ -189,7 +189,7 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('clip_features_linear.png')
+    plt.savefig('clip_features_linear_30e_5p_best_model.png')
     plt.close()
 
 visualize_features(test_features, test_labels, 'Test Features')

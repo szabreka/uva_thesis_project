@@ -22,6 +22,7 @@ from datetime import datetime
 from torch.nn.parallel import DataParallel
 import random
 from sklearn.decomposition import PCA
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts,  ReduceLROnPlateau
 
 # Define device
 if torch.cuda.is_available():
@@ -178,11 +179,15 @@ if device == "cpu":
   model.float()
 
 #Define number of epochs
-num_epochs = 25
+num_epochs = 10
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0001,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+#optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+#scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+#scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)
+
 
 # Specify the loss functions - for images and for texts
 loss_img = nn.CrossEntropyLoss()
@@ -191,7 +196,7 @@ loss_txt = nn.CrossEntropyLoss()
 best_te_loss = 1e5
 best_ep = -1
 early_stopping_counter = 0
-early_stopping_patience = 25
+early_stopping_patience = 30
 early_stopping_threshold = 0.03
 train_accuracies = []
 val_accuracies = []
@@ -247,7 +252,7 @@ for epoch in range(num_epochs):
         value, index = similarity.topk(1)
 
         correct = (index == ground_truth).sum().item()
-        total = labels.size(0)
+        total = len(labels)
         epoch_train_correct += correct
         epoch_train_total += total
         
@@ -319,7 +324,7 @@ for epoch in range(num_epochs):
                 te_loss += total_loss.item()
 
                 correct = (index == ground_truth).sum().item()
-                total = labels.size(0)
+                total = len(labels)
                 epoch_val_correct += correct
                 epoch_val_total += total
 
@@ -351,6 +356,9 @@ for epoch in range(num_epochs):
         val_accuracy = epoch_val_correct / epoch_val_total
         val_losses.append(te_loss)
         val_accuracies.append(val_accuracy)
+
+    #call the scheduler in case of reduceonplato
+    scheduler.step(te_loss)
 
     # Convert lists of arrays to numpy arrays
     all_labels_array = np.concatenate(all_labels)
@@ -386,7 +394,7 @@ for epoch in range(num_epochs):
     if te_loss < best_te_loss:
         best_te_loss = te_loss
         best_ep = epoch
-        torch.save(model.state_dict(), "../fs_best_model.pt")
+        torch.save(model.state_dict(), "../fs_best_model_reduceplato.pt")
         early_stopping_counter = 0
     else:
         early_stopping_counter += 1
@@ -395,11 +403,11 @@ for epoch in range(num_epochs):
 
     if (early_stopping_counter >= early_stopping_patience) or (best_te_loss<=early_stopping_threshold):
         print(f"Early stopping after {epoch + 1} epochs.")
-        torch.save(model.state_dict(), "../fs_last_model.pt")
+        torch.save(model.state_dict(), "../fs_last_model_reduceplato.pt")
         break
 
 print(f"best epoch {best_ep+1}, best te_loss {best_te_loss}")
-torch.save(model.state_dict(), "../fs_last_model.pt")
+torch.save(model.state_dict(), "../fs_last_model_reduceplato.pt")
 
 print('Start testing...')
 
@@ -578,7 +586,7 @@ def get_features(dataloader):
 
     return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy()
 
-#test_features, test_labels = get_features(test_dataloader)
+test_features, test_labels = get_features(test_dataloader)
 #print('Test features created')
 
 def visualize_features(features, labels, title):
@@ -588,7 +596,7 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('clip_fullysupervised_features.png')
+    plt.savefig('clip_fullysupervised_features_reduceplato.png')
     plt.close()
 
-#visualize_features(test_features, test_labels, 'Test Features')
+visualize_features(test_features, test_labels, 'Test Features')
