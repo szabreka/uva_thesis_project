@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from torch.nn.parallel import DataParallel
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from sklearn.linear_model import LogisticRegression
 
 # Define device
 if torch.cuda.is_available():
@@ -275,7 +276,7 @@ if device == "cpu":
   clip_model.float()
 
 class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
-    def __init__(self, clip_model, mobilenet_rnn_model, dataloader):
+    def __init__(self, clip_model, mobilenet_rnn_model):
         super(CLIP_MobileNetV3_RNN_Ensemble, self).__init__()
         #set the models
         self.clip_model = clip_model
@@ -286,30 +287,48 @@ class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
         for param in self.mobilenet_rnn_model.parameters():
             param.requires_grad = False
 
-        #dataloader with preprocessed videos
-        self.dataloader = dataloader
 
-    def forward(self, frames, label, image, classname):
+    def forward(self, frames, image, classname):
         #send all data to device
         images = image.to(device)
-        labels = label.to(device)
         frames = frames.to(device)
         #get clip logits
         text_inputs = clip.tokenize(classname,context_length=77, truncate=True).to(device)
-        print('images', images.shape)
-        print('text', text_inputs.shape)
         #text_inputs.squeeze(dim=1)
         logits_per_image, logits_per_text = self.clip_model(images, text_inputs)
 
         #get mobilenet-rnn logits
         rnn_logits = self.mobilenet_rnn_model(frames)
 
-        #combine the logits
-        combined_logits = (logits_per_image + rnn_logits)/2
+        # Ensure data types for concatenation
+        logits_per_image = logits_per_image.float()
+        rnn_logits = rnn_logits.float()
 
-        return combined_logits
+        #combine logits
+        combined_data = torch.cat((logits_per_image, rnn_logits), dim=1)
 
-ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model, test_dataloader)
+        return combined_data
+
+ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
+
+def get_features(model, dataloader):
+    model.eval()
+    all_features = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for frames, label, image in dataloader:
+            
+            features = model(frames, image, class_names)
+            all_features.extend(features.cpu().numpy())
+            all_labels.extend(label.cpu().numpy())
+    
+    return all_features, all_labels
+
+val_features, val_labels = get_features(ensemble_model, val_dataloader)
+meta_model = LogisticRegression()
+meta_model.fit(val_features, val_labels)
+
 
 def evaluate_model(model, dataloader, device):
     model.eval()
@@ -317,13 +336,12 @@ def evaluate_model(model, dataloader, device):
     all_labels = []
     
     with torch.no_grad():
-        for frames, label, image in dataloader:
             
-            outputs = model(frames, label, image, class_names)
-            _, preds = torch.max(outputs, 1)
+            test_preds, test_labels = get_features(model, dataloader)
+            meta_preds = meta_model.predict(test_preds)
             
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(label.cpu().numpy())
+            all_preds.extend(meta_preds)
+            all_labels.extend(test_labels)
     
     accuracy = accuracy_score(all_labels, all_preds)
     precision = precision_score(all_labels, all_preds, average='binary')

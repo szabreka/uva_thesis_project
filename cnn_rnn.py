@@ -211,9 +211,16 @@ num_epochs = 50
 #optimizer: first trainings:
 #optimizer = torch.optim.Adam(model.parameters(), lr=5e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=1e-6)
 #optimizer: second trainings:
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
+#optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
+#optimizer: third trainings:
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4)
 loss = nn.CrossEntropyLoss()
-scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
+#second_option_scheduler:
+#scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
+#third_option_scheduler:
+#scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
+#4. option:
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 

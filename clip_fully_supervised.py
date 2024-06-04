@@ -161,9 +161,9 @@ print('Datasets created')
 
 #Create dataloader fot training, validation and testig
 
-train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
 
 print('Dataloaders created')
 
@@ -179,14 +179,14 @@ if device == "cpu":
   model.float()
 
 #Define number of epochs
-num_epochs = 10
+num_epochs = 15
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0001,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 #optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 #scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
-scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10, verbose=True)
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, verbose=True)
 
 
 # Specify the loss functions - for images and for texts
@@ -196,7 +196,7 @@ loss_txt = nn.CrossEntropyLoss()
 best_te_loss = 1e5
 best_ep = -1
 early_stopping_counter = 0
-early_stopping_patience = 30
+early_stopping_patience = 5
 early_stopping_threshold = 0.03
 train_accuracies = []
 val_accuracies = []
@@ -250,15 +250,15 @@ for epoch in range(num_epochs):
         # Get and convert similarity scores to predicted labels
         similarity = logits_per_image.softmax(dim=-1)
         value, index = similarity.topk(1)
+        
+        #Convert values to numpy
+        predicted_label = index.squeeze().cpu().numpy()
+        ground_truth_label = ground_truth.cpu().numpy()
 
-        correct = (index == ground_truth).sum().item()
+        correct = (predicted_label == ground_truth_label).sum().item()
         total = len(labels)
         epoch_train_correct += correct
         epoch_train_total += total
-        
-        #Convert values to numpy
-        predicted_label = index.cpu().numpy()
-        ground_truth_label = ground_truth.cpu().numpy()
 
         # Zero out gradients for the optimizer (Adam) - to prevent adding gradients to previous ones
         optimizer.zero_grad()
@@ -323,14 +323,14 @@ for epoch in range(num_epochs):
                 total_loss = loss_img(logits_per_image,ground_truth) 
                 te_loss += total_loss.item()
 
-                correct = (index == ground_truth).sum().item()
+                # Convert similarity scores to predicted labels
+                predicted_label = index.squeeze.cpu().numpy()
+                ground_truth_label = ground_truth.cpu().numpy()
+
+                correct = (predicted_label == ground_truth_label).sum().item()
                 total = len(labels)
                 epoch_val_correct += correct
                 epoch_val_total += total
-
-                # Convert similarity scores to predicted labels
-                predicted_label = index.cpu().numpy()
-                ground_truth_label = ground_truth.cpu().numpy()
 
                 # Append predicted labels and ground truth labels
                 all_preds.append(predicted_label)
@@ -352,10 +352,10 @@ for epoch in range(num_epochs):
                 vbar.set_description(f"Validation: {i}/{len(val_dataloader)}, Validation loss: {total_loss.item():.4f}")
                 i+=1
 
-        te_loss /= step
-        val_accuracy = epoch_val_correct / epoch_val_total
-        val_losses.append(te_loss)
-        val_accuracies.append(val_accuracy)
+    te_loss /= step
+    val_accuracy = epoch_val_correct / epoch_val_total
+    val_losses.append(te_loss)
+    val_accuracies.append(val_accuracy)
 
     #call the scheduler in case of reduceonplato
     scheduler.step(te_loss)
@@ -596,7 +596,7 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('clip_fullysupervised_features_reduceplato.png')
+    plt.savefig('clip_fullysupervised_features_reduceplato_1.png')
     plt.close()
 
 visualize_features(test_features, test_labels, 'Test Features')

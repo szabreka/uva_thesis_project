@@ -24,15 +24,15 @@ from datetime import datetime
 from torch.nn.parallel import DataParallel
 
 # Define device
-'''if torch.cuda.is_available():
+if torch.cuda.is_available():
     device = torch.device("cuda") # use CUDA device
 #elif torch.backends.mps.is_available():
 #    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
 else:
     device = torch.device("cpu") # use CPU device
-print('Used device: ', device)'''
+print('Used device: ', device)
 
-device = torch.device("cpu")
+#device = torch.device("cpu")
 
 class MobileNetV3Small_RNN(nn.Module):
     def __init__(self, num_classes, rnn_type="LSTM"):
@@ -90,9 +90,9 @@ class MobileNetV3Small_RNN(nn.Module):
         
         return logits
     
-model = MobileNetV3Small_RNN(num_classes=2, rnn_type="LSTM")
+model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
 model = model.to(device)
-state_dict = torch.load('../cnn_rnn/light_cnn_last_model_lstm_13e.pt', map_location=device)
+state_dict = torch.load('../light_cnn_best_model.pt', map_location=device)
 '''print("Pretrained Dict Keys:")
 for key in state_dict.keys():
     print(key)'''
