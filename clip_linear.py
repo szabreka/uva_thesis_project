@@ -198,50 +198,39 @@ classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=
 
 # Optionally, use early stopping based on the validation set performance
 # For example, if validation accuracy does not improve for several epochs, stop training
-best_val_accuracy =  0.001
-best_epoch = 0
-num_epochs = 1
-for epoch in range(num_epochs):
-    print(f"Epoch {epoch + 1}/{num_epochs}")
 
-    # Training
-    print('Training')
-    classifier.fit(train_features, train_labels)
 
-    train_predictions = classifier.predict(train_features)
-    train_accuracy = accuracy_score(train_labels, train_predictions)
-    train_precision = precision_score(train_labels, train_predictions)
-    train_recall = recall_score(train_labels, train_predictions)
-    train_f1 = f1_score(train_labels, train_predictions)
+# Training
+print('Training')
+classifier.fit(train_features, train_labels)
 
-    print(f"Train Accuracy = {train_accuracy:.3f}")
-    print(f"Train Precision = {train_precision:.3f}")
-    print(f"Train Recall = {train_recall:.3f}")
-    print(f"Train F1 Score = {train_f1:.3f}")
+train_predictions = classifier.predict(train_features)
+train_accuracy = accuracy_score(train_labels, train_predictions)
+train_precision = precision_score(train_labels, train_predictions)
+train_recall = recall_score(train_labels, train_predictions)
+train_f1 = f1_score(train_labels, train_predictions)
 
-    # Validation
-    print('Validation')
-    val_predictions = classifier.predict(val_features)
+print(f"Train Accuracy = {train_accuracy:.3f}")
+print(f"Train Precision = {train_precision:.3f}")
+print(f"Train Recall = {train_recall:.3f}")
+print(f"Train F1 Score = {train_f1:.3f}")
 
-    val_accuracy = accuracy_score(val_labels, val_predictions)
-    val_precision = precision_score(val_labels, val_predictions)
-    val_recall = recall_score(val_labels, val_predictions)
-    val_f1 = f1_score(val_labels, val_predictions)
+# Validation
+print('Validation')
+val_predictions = classifier.predict(val_features)
 
-    print(f"Validation Accuracy = {val_accuracy:.3f}")
-    print(f"Validation Precision = {val_precision:.3f}")
-    print(f"Validation Recall = {val_recall:.3f}")
-    print(f"Validation F1 Score = {val_f1:.3f}")
+val_accuracy = accuracy_score(val_labels, val_predictions)
+val_precision = precision_score(val_labels, val_predictions)
+val_recall = recall_score(val_labels, val_predictions)
+val_f1 = f1_score(val_labels, val_predictions)
+
+print(f"Validation Accuracy = {val_accuracy:.3f}")
+print(f"Validation Precision = {val_precision:.3f}")
+print(f"Validation Recall = {val_recall:.3f}")
+print(f"Validation F1 Score = {val_f1:.3f}")
+
     
-    
-    if val_accuracy > best_val_accuracy:
-        best_val_accuracy = val_accuracy
-        best_epoch = epoch
-    else:
-        break
 
-# Print the best validation accuracy and the corresponding epoch
-print(f"Best Validation Accuracy = {best_val_accuracy:.3f} at Epoch {best_epoch}")
 
 start_time = datetime.now()
 # Evaluate the trained classifier on the test set
@@ -267,4 +256,3 @@ print("Confusion Matrix:")
 print(conf_matrix)
 
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
-#print("Classifier Model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in classifier.parameters()]):,}")

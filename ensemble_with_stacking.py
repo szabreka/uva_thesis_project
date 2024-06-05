@@ -25,6 +25,7 @@ from datetime import datetime
 from torch.nn.parallel import DataParallel
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.linear_model import LogisticRegression
+import joblib
 
 # Define device
 if torch.cuda.is_available():
@@ -100,9 +101,11 @@ rnn_model.eval()
 
 
 clip_model, preprocess = clip.load('ViT-B/16', device, jit=False)
-state_dict = torch.load('../clip_fully_supervised/fs_best_model_5e_5p.pt', map_location=device)
+state_dict = torch.load('../clip_fully_supervised/fs_last_model_reduceplato_5p_11e.pt', map_location=device)
 clip_model.load_state_dict(state_dict)
 clip_model.eval()
+
+logreg_model = joblib.load('../clip_lin/final_logreg_model_grid_11e_5p_last_reduceplato.sav')
 
 class ImageTitleDataset(Dataset):
     def __init__(self, list_video_path, list_labels, rnn_transform_image, clip_transform_image):
@@ -309,7 +312,47 @@ class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
 
         return combined_data
 
-ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
+class CLIP_GLIN_MobileNetV3_RNN_Ensemble(nn.Module):
+    def __init__(self, clip_model, mobilenet_rnn_model, logreg_model):
+        super(CLIP_GLIN_MobileNetV3_RNN_Ensemble, self).__init__()
+        #set the models
+        self.clip_model = clip_model
+        self.mobilenet_rnn_model = mobilenet_rnn_model
+        self.logreg_model = logreg_model
+
+        for param in self.clip_model.parameters():
+            param.requires_grad = False
+        for param in self.mobilenet_rnn_model.parameters():
+            param.requires_grad = False
+
+
+    def forward(self, frames, image, classname):
+        #send all data to device
+        images = image.to(device)
+        frames = frames.to(device)
+        #get clip logits
+        features = self.clip_model.encode_image(images.to(device)).cpu().numpy()
+        clip_glin_pred = self.logreg_model.predict_proba(features)
+        clip_glin_pred = torch.tensor(clip_glin_pred).to(device)
+        #to get the logits instead of the probabilites (this is the formula to capture logits)
+        clip_glin_pred = torch.log(clip_glin_pred / (1 - clip_glin_pred))
+
+        #get mobilenet-rnn logits
+        rnn_logits = self.mobilenet_rnn_model(frames)
+
+        # Ensure data types for concatenation
+        clip_glin_pred = clip_glin_pred.float()
+        rnn_logits = rnn_logits.float()
+
+        #combine logits
+        combined_data = torch.cat((clip_glin_pred, rnn_logits), dim=1)
+
+        return combined_data
+
+#simple clip model without lin layer:
+#ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
+#clip model with lin layer:
+ensemble_model = CLIP_GLIN_MobileNetV3_RNN_Ensemble(clip_model, rnn_model,logreg_model)
 
 def get_features(model, dataloader):
     model.eval()

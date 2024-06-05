@@ -3,23 +3,19 @@ import os
 import clip
 import torch
 import numpy as np
-from sklearn.linear_model import LogisticRegression
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
 import json
 import cv2
 from torchvision.transforms import ToTensor
 import pandas as pd
 from PIL import Image
 import torch.nn as nn
-import torch.optim as optim
 import torchvision.transforms as transforms
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 import matplotlib.pyplot as plt
 from datetime import datetime
-from torch.nn.parallel import DataParallel
 import random
 from sklearn.decomposition import PCA
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts,  ReduceLROnPlateau
@@ -27,17 +23,15 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts,  ReduceLROnPla
 # Define device
 if torch.cuda.is_available():
     device = torch.device("cuda") # use CUDA device
-#elif torch.backends.mps.is_available():
-#    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
+elif torch.backends.mps.is_available():
+    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
 else:
     device = torch.device("cpu") # use CPU device
 print('Used device: ', device)
 
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
-'''if torch.cuda.device_count() > 1:
-    print("Let's use", torch.cuda.device_count(), "GPUs!")
-    model = DataParallel(model)'''
+
 
 # Load the dataset
 class ImageTitleDataset(Dataset):
@@ -51,7 +45,6 @@ class ImageTitleDataset(Dataset):
         #Initialize class names (no smoke or smoke)
         self.class_names = class_names
         #Transform to tensor
-        #self.transforms = ToTensor()
         self.transform_image = transform_image
 
     @staticmethod
@@ -77,16 +70,18 @@ class ImageTitleDataset(Dataset):
         if len(frames) != 36:
             print("Num of frames are not 36")
             print("Num of frames for video on ", video_path, "is ", len(frames))
+            concatenated_frames = np.concatenate(frames, axis=1)
         
-        # Create  and store rows in the grids
-        rows_list = []
-        for i in range(num_rows):
-            #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
-            row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
-            rows_list.append(row)
-        
-        # Concatenate grid vertically to create a single square-shaped image from the smoke video
-        concatenated_frames = np.concatenate(rows_list, axis=0)
+        else:
+            # Create  and store rows in the grids
+            rows_list = []
+            for i in range(num_rows):
+                #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
+                row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
+                rows_list.append(row)
+            
+            # Concatenate grid vertically to create a single square-shaped image from the smoke video
+            concatenated_frames = np.concatenate(rows_list, axis=0)
         return concatenated_frames
 
     def __len__(self):
@@ -106,35 +101,35 @@ class ImageTitleDataset(Dataset):
         return image, label, true_label
     
 #Define training, validation and test data
-# Load the JSON metadata
-with open('data/split/metadata_train_split_by_date.json', 'r') as f:
-    train_data = json.load(f)
-with open('data/split/metadata_validation_split_by_date.json', 'r') as f:
-    val_data = json.load(f)
-with open('data/split/metadata_test_split_by_date.json', 'r') as f:
-    test_data = json.load(f)
+
+def load_data(split_path):
+    with open(split_path, 'r') as f:
+        data = json.load(f)
+    return pd.DataFrame(data)
+
+train_data = load_data('data/split/metadata_train_split_by_date.json')
+val_data = load_data('data/split/metadata_validation_split_by_date.json')
+test_data = load_data('data/split/metadata_test_split_by_date.json')
 
 
-# Convert the datasets to a Pandas DataFrame
-train_data = pd.DataFrame(train_data)
-val_data = pd.DataFrame(val_data)
-test_data = pd.DataFrame(test_data)
+#Prepare the list of video file paths and labels
 
+def prepare_paths_labels(data, base_path):
+    list_video_path = [os.path.join(base_path, f"{fn}.mp4") for fn in data['file_name']]
+    list_labels = [int(label) for label in data['label']]
+    return list_video_path, list_labels
 
-# Prepare the list of video file paths and labels
-train_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in train_data['file_name']]
-train_list_labels = [int(label) for label in train_data['label']]
-val_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in val_data['file_name']]
-val_list_labels = [int(label) for label in val_data['label']]
-test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
-test_list_labels = [int(label) for label in test_data['label']]
+base_path = "/../projects/0/prjs0930/data/merged_videos/"
+train_list_video_path, train_list_labels = prepare_paths_labels(train_data, base_path)
+val_list_video_path, val_list_labels = prepare_paths_labels(val_data, base_path)
+test_list_video_path, test_list_labels = prepare_paths_labels(test_data, base_path)
 
 #Define class names in a list - it needs prompt engineering
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
-class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
+class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
+#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
@@ -186,7 +181,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e
 #optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 #scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
-scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, verbose=True)
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)
 
 
 # Specify the loss functions - for images and for texts
@@ -324,7 +319,7 @@ for epoch in range(num_epochs):
                 te_loss += total_loss.item()
 
                 # Convert similarity scores to predicted labels
-                predicted_label = index.squeeze.cpu().numpy()
+                predicted_label = index.squeeze().cpu().numpy()
                 ground_truth_label = ground_truth.cpu().numpy()
 
                 correct = (predicted_label == ground_truth_label).sum().item()
@@ -596,7 +591,7 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('clip_fullysupervised_features_reduceplato_1.png')
+    plt.savefig('clip_fullysupervised_features_reduceplato_4p.png')
     plt.close()
 
 visualize_features(test_features, test_labels, 'Test Features')

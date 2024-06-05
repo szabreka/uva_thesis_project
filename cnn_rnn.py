@@ -227,7 +227,7 @@ scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, ver
 best_te_loss = 1e5
 best_ep = -1
 early_stopping_counter = 0
-early_stopping_patience = 5
+early_stopping_patience = 10
 train_accuracies = []
 val_accuracies = []
 train_losses = []
@@ -312,12 +312,12 @@ for epoch in range(num_epochs):
             vbar.set_description(f"Validation: {i}/{len(val_dataloader)}, Validation loss: {val_loss.item():.4f}")
             i+=1
 
-        te_loss /= step
-        val_accuracy = epoch_val_correct / epoch_val_total
-        print("Validation accuracy: ", val_accuracy)
-        val_losses.append(te_loss)
-        val_accuracies.append(val_accuracy)
-        train_losses.append(te_loss)
+    te_loss /= step
+    val_accuracy = epoch_val_correct / epoch_val_total
+    print("Validation accuracy: ", val_accuracy)
+    val_losses.append(te_loss)
+    val_accuracies.append(val_accuracy)
+    train_losses.append(te_loss)
     
     scheduler.step(te_loss)
 

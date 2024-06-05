@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.model_selection import GridSearchCV
 from datetime import datetime
+import joblib
 
 # Define device
 if torch.cuda.is_available():
@@ -35,7 +36,7 @@ print('Used device: ', device)
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
 #state_dict = torch.load('../clip_fully_supervised/fs_best_model_11e_4p.pt', map_location=device)
-state_dict = torch.load('../fs_best_model.pt', map_location=device)
+state_dict = torch.load('../fs_last_model_reduceplato.pt', map_location=device)
 model.load_state_dict(state_dict)
 
 # Load the dataset
@@ -190,9 +191,6 @@ def get_features(dataloader, name):
     
     features = torch.cat(all_features).cpu().numpy()
     labels = torch.cat(all_labels).cpu().numpy()
-    
-    print(f"{name} Features Shape: {features.shape}")
-    print(f"{name} Labels Distribution: {np.bincount(labels)}")
     return features, labels
 
 train_features, train_labels = get_features(train_dataloader, 'Train')
@@ -209,10 +207,10 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('1e_5p_best_features_examples.png')
+    plt.savefig('best_features_examples-reduceplato.png')
     plt.close()
 
-visualize_features(test_features, test_labels, 'Test Features')
+#visualize_features(test_features, test_labels, 'Test Features')
 
 param_grid = {
     'penalty': ['none','l1','l2'],
@@ -273,4 +271,7 @@ target_names = ['class 0', 'class 1']
 print(classification_report(test_labels, test_predictions, target_names=target_names))
 
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
-print("Classifier Model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in best_classifier.parameters()]):,}")
+
+#save model
+filename = 'final_logreg_model_last_reduceplato.sav'
+joblib.dump(best_classifier, filename)
