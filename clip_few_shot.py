@@ -70,6 +70,7 @@ class ImageTitleDataset(Dataset):
         if len(frames) != 36:
             print("Num of frames are not 36")
             print("Num of frames for video on ", video_path, "is ", len(frames))
+            concatenated_frames = np.concatenate(frames, axis=1)
         
         # Create  and store rows in the grids
         rows_list = []
@@ -122,11 +123,11 @@ test_list_labels = [int(label) for label in test_data['label']]
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
 #class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
-#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
+class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
-class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
+#class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
 #class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
 #class_names = ['no smoke', 'smoke']
 
@@ -180,7 +181,8 @@ if device == "cpu":
 num_epochs = 1
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+#optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+optimizer = torch.optim.Adam(model.parameters(), lr=5e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 # Specify the loss functions - for images and for texts
@@ -198,12 +200,10 @@ for epoch in range(num_epochs):
 
         # Move images and texts to the specified device (CPU or GPU)
         images= images.to(device)
-        texts = labels.to(device)
         true_label = true_label.to(device)
         text_inputs = clip.tokenize(class_names).to(device)
 
         #Squeeze texts tensor to match the required size
-        texts = texts.squeeze(dim = 1)
         text_inputs = text_inputs.squeeze(dim = 1)
 
         # Forward pass - Run the model on the input data (images and texts)
@@ -215,9 +215,6 @@ for epoch in range(num_epochs):
 
         #Ground truth
         ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
-
-        #Compute loss - contrastive loss to pull similar pairs closer together
-        #total_loss = (loss_img(logits_per_image,ground_truth) + loss_txt(logits_per_text.T,ground_truth))/2
 
         #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
         total_loss = loss_img(logits_per_image, ground_truth) 

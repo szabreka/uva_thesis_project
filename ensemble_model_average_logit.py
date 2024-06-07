@@ -234,7 +234,7 @@ rnn_val_test_transform = transforms.Compose([
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
+#class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
 class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
@@ -254,16 +254,12 @@ clip_transform_steps = transforms.Compose([
 ])
 
 # Create dataset and data loader for training, validation and testing
-train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, rnn_train_transform ,clip_transform_steps)
-val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, rnn_val_test_transform, clip_transform_steps)
 test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, rnn_val_test_transform, clip_transform_steps)
 
-print('Datasets created')
+print('Dataset created')
 
-train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-print('Dataloaders created')
+print('Dataloader created')
 
 def convert_models_to_fp32(model): 
     for p in model.parameters(): 
@@ -289,7 +285,7 @@ class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
         #dataloader with preprocessed videos
         self.dataloader = dataloader
 
-    def forward(self, frames, label, image, classname):
+    def forward(self, frames, label, image, classname, w_clip = 1,  w_cnn = 1, ):
         #send all data to device
         images = image.to(device)
         labels = label.to(device)
@@ -305,7 +301,8 @@ class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
         rnn_logits = self.mobilenet_rnn_model(frames)
 
         #combine the logits
-        combined_logits = (logits_per_image + rnn_logits)/2
+        #combined_logits = ( w_clip * logits_per_image + w_cnn * rnn_logits)/2
+        combined_logits = ( w_clip * logits_per_image * w_cnn * rnn_logits)
 
         return combined_logits
 
@@ -319,7 +316,7 @@ def evaluate_model(model, dataloader, device):
     with torch.no_grad():
         for frames, label, image in dataloader:
             
-            outputs = model(frames, label, image, class_names)
+            outputs = model(frames, label, image, class_names,  1 , 1)
             _, preds = torch.max(outputs, 1)
             
             all_preds.extend(preds.cpu().numpy())

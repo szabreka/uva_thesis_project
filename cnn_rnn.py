@@ -65,6 +65,9 @@ class MobileNetV3Small_RNN(nn.Module):
         else:
             raise ValueError("Invalid RNN type. Choose 'LSTM' or 'GRU'.")
 
+        #Dropout layer
+        #self.dropout = nn.Dropout(p=0.5)
+
         #final classification layer - to get logits for the two classes
         self.fc = nn.Linear(256, num_classes)
 
@@ -85,6 +88,9 @@ class MobileNetV3Small_RNN(nn.Module):
         #get rnn output by passing the features to the selected rnn
         rnn_out, _ = self.rnn(features)
         
+        #dropout layer
+        #rnn_out = self.dropout(rnn_out)
+
         #batch, timesteps, output features
         #only select the last of the timesteps as it holds the information of the whole video
         last_output = rnn_out[:, -1, :]
@@ -154,26 +160,26 @@ class ImageTitleDataset(Dataset):
     
 
 #Define training, validation and test data
-# Load the JSON metadata
-with open('data/split/metadata_train_split_by_date.json', 'r') as f:
-    train_data = json.load(f)
-with open('data/split/metadata_validation_split_by_date.json', 'r') as f:
-    val_data = json.load(f)
-with open('data/split/metadata_test_split_by_date.json', 'r') as f:
-    test_data = json.load(f)
+def load_data(split_path):
+    with open(split_path, 'r') as f:
+        data = json.load(f)
+    return pd.DataFrame(data)
 
-# Convert the datasets to a Pandas DataFrame
-train_data = pd.DataFrame(train_data)
-val_data = pd.DataFrame(val_data)
-test_data = pd.DataFrame(test_data)
+train_data = load_data('data/split/metadata_train_split_by_date.json')
+val_data = load_data('data/split/metadata_validation_split_by_date.json')
+test_data = load_data('data/split/metadata_test_split_by_date.json')
 
 # Prepare the list of video file paths and labels
-train_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in train_data['file_name']]
-train_list_labels = [int(label) for label in train_data['label']]
-val_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in val_data['file_name']]
-val_list_labels = [int(label) for label in val_data['label']]
-test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
-test_list_labels = [int(label) for label in test_data['label']]
+#Prepare the list of video file paths and labels
+def prepare_paths_labels(data, base_path):
+    list_video_path = [os.path.join(base_path, f"{fn}.mp4") for fn in data['file_name']]
+    list_labels = [int(label) for label in data['label']]
+    return list_video_path, list_labels
+
+base_path = "/../projects/0/prjs0930/data/merged_videos/"
+train_list_video_path, train_list_labels = prepare_paths_labels(train_data, base_path)
+val_list_video_path, val_list_labels = prepare_paths_labels(val_data, base_path)
+test_list_video_path, test_list_labels = prepare_paths_labels(test_data, base_path)
 
 # Define input resolution
 input_resolution = (256, 256)
@@ -213,21 +219,22 @@ num_epochs = 50
 #optimizer: second trainings:
 #optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
 #optimizer: third trainings:
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4)
+#optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 loss = nn.CrossEntropyLoss()
 #second_option_scheduler:
 #scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
 #third_option_scheduler:
 #scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
 #4. option:
-scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
+scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 
 best_te_loss = 1e5
 best_ep = -1
 early_stopping_counter = 0
-early_stopping_patience = 10
+early_stopping_patience = 5
 train_accuracies = []
 val_accuracies = []
 train_losses = []
@@ -350,12 +357,13 @@ for epoch in range(num_epochs):
 
     print(f"epoch {epoch}, tr_loss {tr_loss}, te_loss {te_loss}")
 
+    torch.save(model.state_dict(), "../light_cnn_last_model.pt")
+
     if early_stopping_counter >= early_stopping_patience:
         print(f"Early stopping after {epoch + 1} epochs.")
         break
     
 print(f"best epoch {best_ep+1}, best te_loss {best_te_loss}")
-torch.save(model.state_dict(), "../light_cnn_last_model.pt")
 
 print("start testing")
 model.eval()

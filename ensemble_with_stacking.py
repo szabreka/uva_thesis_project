@@ -101,11 +101,11 @@ rnn_model.eval()
 
 
 clip_model, preprocess = clip.load('ViT-B/16', device, jit=False)
-state_dict = torch.load('../clip_fully_supervised/fs_last_model_reduceplato_5p_11e.pt', map_location=device)
+state_dict = torch.load('../fs_last_model_11p_5e.pt', map_location=device)
 clip_model.load_state_dict(state_dict)
 clip_model.eval()
 
-logreg_model = joblib.load('../clip_lin/final_logreg_model_grid_11e_5p_last_reduceplato.sav')
+#logreg_model = joblib.load('../clip_lin/final_logreg_model_grid_11e_5p_last_reduceplato.sav')
 
 class ImageTitleDataset(Dataset):
     def __init__(self, list_video_path, list_labels, rnn_transform_image, clip_transform_image):
@@ -350,9 +350,9 @@ class CLIP_GLIN_MobileNetV3_RNN_Ensemble(nn.Module):
         return combined_data
 
 #simple clip model without lin layer:
-#ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
+ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
 #clip model with lin layer:
-ensemble_model = CLIP_GLIN_MobileNetV3_RNN_Ensemble(clip_model, rnn_model,logreg_model)
+#ensemble_model = CLIP_GLIN_MobileNetV3_RNN_Ensemble(clip_model, rnn_model,logreg_model)
 
 def get_features(model, dataloader):
     model.eval()

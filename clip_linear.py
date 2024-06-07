@@ -33,7 +33,7 @@ print('Used device: ', device)
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
-state_dict = torch.load('../clip_fully_supervised/fs_best_model_30e_5p.pt', map_location=device)
+state_dict = torch.load('../fs_last_model_reduceplato_15e_4p.pt', map_location=device)
 model.load_state_dict(state_dict)
 
 # Load the dataset
@@ -192,7 +192,7 @@ def visualize_features(features, labels, title):
     plt.savefig('clip_features_linear_30e_5p_best_model.png')
     plt.close()
 
-visualize_features(test_features, test_labels, 'Test Features')
+#visualize_features(test_features, test_labels, 'Test Features')
 
 classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
 

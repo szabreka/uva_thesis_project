@@ -20,36 +20,35 @@ import random
 from sklearn.decomposition import PCA
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts,  ReduceLROnPlateau
 
-# Define device
+#Define the device
 if torch.cuda.is_available():
-    device = torch.device("cuda") # use CUDA device
+    device = torch.device("cuda")
 elif torch.backends.mps.is_available():
-    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
+    device = torch.device("mps")
 else:
-    device = torch.device("cpu") # use CPU device
+    device = torch.device("cpu")
 print('Used device: ', device)
 
-#Load CLIP model - ViT B32
+#Load CLIP model - ViT B16 (need to pip install clip first)
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
 
-# Load the dataset
+#Load the dataset
 class ImageTitleDataset(Dataset):
     def __init__(self, list_video_path, list_labels, class_names, transform_image):
-        #to handle the parent class
+        #To handle the parent class
         super().__init__()
         #Initalize image paths and corresponding texts
         self.video_path = list_video_path
         #Initialize labels (0 or 1)
         self.labels = list_labels
-        #Initialize class names (no smoke or smoke)
+        #Initialize class names (no smoke or smoke in prompts)
         self.class_names = class_names
-        #Transform to tensor
+        #Transform the image to the required tensor
         self.transform_image = transform_image
 
     @staticmethod
     #Function to create a square-shaped image from the video (similar to 1 long image)
-    #To do: what if the video has more frames than 36?
     def preprocess_video_to_image_grid_version(video_path, num_rows=6, num_cols=6):
         #Open the video file
         video = cv2.VideoCapture(video_path)
@@ -67,20 +66,20 @@ class ImageTitleDataset(Dataset):
                 frames.append(frame_rgb)
             video.release()
         
+        #If the video has a different amount of frames from 36, then produce a long image
         if len(frames) != 36:
             print("Num of frames are not 36")
             print("Num of frames for video on ", video_path, "is ", len(frames))
             concatenated_frames = np.concatenate(frames, axis=1)
-        
         else:
-            # Create  and store rows in the grids
+            #Create  and store rows in the grids
             rows_list = []
             for i in range(num_rows):
                 #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
                 row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
                 rows_list.append(row)
             
-            # Concatenate grid vertically to create a single square-shaped image from the smoke video
+            #Concatenate grid vertically to create a single square-shaped image from the smoke video
             concatenated_frames = np.concatenate(rows_list, axis=0)
         return concatenated_frames
 
@@ -88,20 +87,19 @@ class ImageTitleDataset(Dataset):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        #tranform videos into images and preprocess with clip's function
+        #Tranform videos into images and preprocess with clip's function
         video_path = self.video_path[idx]
         image = self.preprocess_video_to_image_grid_version(video_path)
         image = Image.fromarray(image)
         image = self.transform_image(image)
-        #image = preprocess(image)
-        #get the corresponding class names and tokenize
+        #Get the corresponding class names and tokenize
         true_label = self.labels[idx]
         label = self.class_names[true_label]
         label = clip.tokenize(label, context_length=77, truncate=True)
         return image, label, true_label
-    
-#Define training, validation and test data
 
+
+#Define training, validation and test data
 def load_data(split_path):
     with open(split_path, 'r') as f:
         data = json.load(f)
@@ -113,7 +111,6 @@ test_data = load_data('data/split/metadata_test_split_by_date.json')
 
 
 #Prepare the list of video file paths and labels
-
 def prepare_paths_labels(data, base_path):
     list_video_path = [os.path.join(base_path, f"{fn}.mp4") for fn in data['file_name']]
     list_labels = [int(label) for label in data['label']]
@@ -124,18 +121,20 @@ train_list_video_path, train_list_labels = prepare_paths_labels(train_data, base
 val_list_video_path, val_list_labels = prepare_paths_labels(val_data, base_path)
 test_list_video_path, test_list_labels = prepare_paths_labels(test_data, base_path)
 
+
 #Define class names in a list - it needs prompt engineering
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
-#class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
-#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
+#class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emitting smoke from chimney"] #- 3
+#class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
+class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
 #class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
 #class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
 #class_names = ['no smoke', 'smoke'] #-11
+#class_names = ['a photo of an industrial facility, emitting no smoke', 'a photo of an industrial facility, emitting smoke'] #12
 
 # Define input resolution
 input_resolution = (224, 224)
@@ -156,14 +155,13 @@ print('Datasets created')
 
 #Create dataloader fot training, validation and testig
 
-train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
-test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 print('Dataloaders created')
 
-# Function to convert model's parameters to FP32 format
-#This is done so that our model loads in the provided memory
+#Function to convert model's parameters to FP32 format - this is done so that our model loads in the provided memory
 def convert_models_to_fp32(model): 
     for p in model.parameters(): 
         p.data = p.data.float() 
@@ -174,19 +172,18 @@ if device == "cpu":
   model.float()
 
 #Define number of epochs
-num_epochs = 15
+num_epochs = 25
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-#optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-7,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+#Different tried schedulers:
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 #scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
-scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)
+#scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)
 
 
-# Specify the loss functions - for images and for texts
+# Specify the loss function - for images only
 loss_img = nn.CrossEntropyLoss()
-loss_txt = nn.CrossEntropyLoss()
 
 best_te_loss = 1e5
 best_ep = -1
@@ -198,7 +195,7 @@ val_accuracies = []
 train_losses = []
 val_losses = []
 
-# Model training
+#Model training
 print('starts training')
 for epoch in range(num_epochs):
     print(f"running epoch {epoch}, best test loss {best_te_loss} after epoch {best_ep}")
@@ -211,20 +208,18 @@ for epoch in range(num_epochs):
     for batch in pbar:
         step += 1
 
-        # Extract images and texts from the batch
+        #Extact images, class_names and labels from batch
         images, labels, true_label = batch 
 
-        # Move images and texts to the specified device (CPU or GPU)
+        #Move images and texts to the specified device (CPU or GPU)
         images= images.to(device)
-        texts = labels.to(device)
         true_label = true_label.to(device)
         text_inputs = clip.tokenize(class_names).to(device)
 
         #Squeeze texts tensor to match the required size
-        texts = texts.squeeze(dim = 1)
         text_inputs = text_inputs.squeeze(dim = 1)
 
-        # Forward pass - Run the model on the input data (images and texts)
+        #Forward pass - Run the model on the input data (images and texts from class names)
         logits_per_image, logits_per_text = model(images, text_inputs)
 
         #Transform logits to float to match required dtype 
@@ -233,11 +228,6 @@ for epoch in range(num_epochs):
 
         #Ground truth
         ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
-
-        print("ground truth: ",ground_truth)
-
-        #Compute loss - contrastive loss to pull similar pairs closer together
-        #total_loss = (loss_img(logits_per_image,ground_truth) + loss_txt(logits_per_text.T,ground_truth))/2
 
         #One image should match 1 label, but 1 label can match will multiple images (when single label classification)
         total_loss = loss_img(logits_per_image, ground_truth) 
@@ -250,12 +240,13 @@ for epoch in range(num_epochs):
         predicted_label = index.squeeze().cpu().numpy()
         ground_truth_label = ground_truth.cpu().numpy()
 
+        #get correct and total predictions for training accuracy 
         correct = (predicted_label == ground_truth_label).sum().item()
         total = len(labels)
         epoch_train_correct += correct
         epoch_train_total += total
 
-        # Zero out gradients for the optimizer (Adam) - to prevent adding gradients to previous ones
+        #Zero out gradients for the optimizer - to prevent adding gradients to previous ones
         optimizer.zero_grad()
 
         # Backward pass
@@ -263,15 +254,13 @@ for epoch in range(num_epochs):
         tr_loss += total_loss.item()
         if device == "cpu":
             optimizer.step()
-            #scheduler.step()
         else : 
-            # Convert model's parameters to FP32 format, update, and convert back
+            #Convert model's parameters to FP32 format, update, and convert back
             convert_models_to_fp32(model)
             optimizer.step()
-            #scheduler.step()
             clip.model.convert_weights(model)
-        # Update the progress bar with the current epoch and loss
-        pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {total_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")
+        #Update the progress bar with the current epoch and loss
+        pbar.set_description(f"Epoch {epoch+1}/{num_epochs}, Loss: {total_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")
     tr_loss /= step
     train_accuracy = epoch_train_correct / epoch_train_total
     print('Training accuracy: ', train_accuracy)
@@ -291,14 +280,12 @@ for epoch in range(num_epochs):
         i = 0
         for batch in vbar:
                 step += 1
-                # Extract images and texts from the batch
+                #Extract images, class names and labels from the batch
                 images, labels, true_label = batch 
-                # Move images and texts to the specified device
+                #Move images and texts to the specified device
                 images = images.to(device)
-                texts = labels.to(device)
                 true_label = true_label.to(device)
                 text_inputs = clip.tokenize(class_names).to(device)
-                texts = texts.squeeze(dim=1)
                 text_inputs.squeeze(dim=1)
 
                 # Forward pass
@@ -308,7 +295,7 @@ for epoch in range(num_epochs):
                 logits_per_image = logits_per_image.float()
                 logits_per_text = logits_per_text.float()
 
-                # Get and convert similarity scores to predicted labels - values are the probabilities, indicies are the classes
+                #Get and convert similarity scores to predicted labels - values are the probabilities, indicies are the classes
                 similarity = logits_per_image.softmax(dim=-1)
                 value, index = similarity.topk(1)
 
@@ -318,7 +305,7 @@ for epoch in range(num_epochs):
                 total_loss = loss_img(logits_per_image,ground_truth) 
                 te_loss += total_loss.item()
 
-                # Convert similarity scores to predicted labels
+                #Convert similarity scores to predicted labels
                 predicted_label = index.squeeze().cpu().numpy()
                 ground_truth_label = ground_truth.cpu().numpy()
 
@@ -352,30 +339,27 @@ for epoch in range(num_epochs):
     val_losses.append(te_loss)
     val_accuracies.append(val_accuracy)
 
-    #call the scheduler in case of reduceonplato
-    scheduler.step(te_loss)
+    #Call the scheduler
+    #scheduler.step(te_loss)
 
-    # Convert lists of arrays to numpy arrays
+    #Convert lists of arrays to numpy arrays
     all_labels_array = np.concatenate(all_labels)
     all_preds_array = np.concatenate(all_preds)
 
-    # Convert to 1D arrays
+    #Convert to 1D arrays
     all_labels_flat = all_labels_array.flatten()
     all_preds_flat = all_preds_array.flatten()
 
-    # Ensure they are integers
+    #Ensure they are integers
     all_labels_int = all_labels_flat.astype(int)
     all_preds_int = all_preds_flat.astype(int)
 
-    # Calculate confusion matrix
+    #Calculate confusion matrix
     conf_matrix = confusion_matrix(all_labels_int, all_preds_int)
-
-    # Print or visualize the confusion matrix
     print("Confusion Matrix:")
     print(conf_matrix)
 
-    #get evaluation metrics:
-
+    #Get evaluation metrics:
     precision = precision_score(all_labels_int, all_preds_int, average='binary')
     recall = recall_score(all_labels_int, all_preds_int, average='binary')
     f_score= f1_score(all_labels_int, all_preds_int, average='binary')
@@ -386,27 +370,27 @@ for epoch in range(num_epochs):
     print(f"Validation Recall: {recall:.4f}")
     print(f"Validation F1 Score: {f_score:.4f}")
 
+    #save best model and set the value of early stopping counter based loss
     if te_loss < best_te_loss:
         best_te_loss = te_loss
         best_ep = epoch
-        torch.save(model.state_dict(), "../fs_best_model_reduceplato.pt")
+        torch.save(model.state_dict(), "../fs_best_model_12p.pt")
         early_stopping_counter = 0
     else:
         early_stopping_counter += 1
 
-    print(f"epoch {epoch}, tr_loss {tr_loss}, te_loss {te_loss}")
+    #save last model
+    print(f"epoch {epoch+1}, tr_loss {tr_loss}, te_loss {te_loss}")
+    torch.save(model.state_dict(), "../fs_last_model_12p.pt")
 
     if (early_stopping_counter >= early_stopping_patience) or (best_te_loss<=early_stopping_threshold):
         print(f"Early stopping after {epoch + 1} epochs.")
-        torch.save(model.state_dict(), "../fs_last_model_reduceplato.pt")
         break
 
 print(f"best epoch {best_ep+1}, best te_loss {best_te_loss}")
-torch.save(model.state_dict(), "../fs_last_model_reduceplato.pt")
-
 print('Start testing...')
 
-
+#Testing model
 model.eval()
 test_preds = []
 test_labels = []
@@ -458,45 +442,45 @@ with torch.no_grad():
         print('Ending time: ', end_time)
         print('Overall time: ', end_time-start_time)
     
-# Convert lists of arrays to numpy arrays
+#Convert lists of arrays to numpy arrays
 all_labels_array = np.concatenate(test_labels)
 all_preds_array = np.concatenate(test_preds)
 
-# Convert to 1D arrays
+#Convert to 1D arrays
 all_labels_flat = all_labels_array.flatten()
 all_preds_flat = all_preds_array.flatten()
 
-# Ensure they are integers
+#Ensure they are integers
 all_labels_int = all_labels_flat.astype(int)
 all_preds_int = all_preds_flat.astype(int)
 
-# Calculate confusion matrix
+#Calculate confusion matrix
 conf_matrix = confusion_matrix(all_labels_int, all_preds_int)
 
-# Print or visualize the confusion matrix
+#Print the confusion matrix
 print("Confusion Matrix:")
 print(conf_matrix)
 
-#get evaluation metrics:
-
+#Get evaluation metrics:
 precision = precision_score(all_labels_int, all_preds_int, average='binary')
 recall = recall_score(all_labels_int, all_preds_int, average='binary')
 f_score= f1_score(all_labels_int, all_preds_int, average='binary')
 acc = accuracy_score(all_labels_int, all_preds_int)
 
-# Print or log the metrics
+#Print the metrics
 print(f"Test Accuracy: {acc:.4f}")
 print(f"Test Precision: {precision:.4f}")
 print(f"Test Recall: {recall:.4f}")
 print(f"Test F1 Score: {f_score:.4f}")
 
+#Get number of CLIP model parameters (shouldn't change)
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
 
-# Classification report
+#Classification report
 target_names = ['class 0', 'class 1']
 print(classification_report(all_labels_int, all_preds_int , target_names=target_names))
 
-# Plot the training and validation accuracy
+#Plot the training and validation accuracy
 plt.figure(figsize=(10, 5))
 plt.plot(train_accuracies, label='Training Accuracy')
 plt.plot(val_accuracies, label='Validation Accuracy')
@@ -504,11 +488,11 @@ plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.legend()
 plt.title('Training and Validation Accuracy')
-plt.savefig('training_validation_accuracy.png')
+plt.savefig('training_validation_accuracy_5p.png')
 plt.close()
 
 
-# Plot the training and validation loss
+#Plot the training and validation loss
 plt.figure(figsize=(10, 5))
 plt.plot(train_losses, label='Training Loss')
 plt.plot(val_losses, label='Validation Loss')
@@ -516,43 +500,44 @@ plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
 plt.title('Training and Validation Loss')
-plt.savefig('training_validation_loss.png')
+plt.savefig('training_validation_loss_5p.png')
 plt.close()
 
+#Based on code provided by OpenAI
 def visualize_random_images(dataset, num_images=9):
-    # Select random indices
+    #Select random indices
     random_indices = random.sample(range(len(dataset)), num_images)
     
-    # Prepare plot
+    #Prepare plot
     fig, axes = plt.subplots(3, 3, figsize=(20, 14))
     axes = axes.flatten()
     
-    # Prepare CLIP model and text inputs
+    #Prepare CLIP model and text inputs
     model.eval()
     text_inputs = clip.tokenize(class_names).to(device)
     
     with torch.no_grad():
         for i, idx in enumerate(random_indices):
-            # Get image, label, and true label
+            #Get image, class_names, and true label
             image, label, true_label = dataset[idx]
             image = image.unsqueeze(0).to(device)
             texts = label.to(device)
             texts = texts.squeeze(dim=1)
             text_inputs.squeeze(dim=1)
 
-            # Calculate features
+            #Calculate features
             image_features = model.encode_image(image)
             text_features = model.encode_text(text_inputs)
 
-            # Calculate similarity
+            #Calculate similarity
             image_features /= image_features.norm(dim=-1, keepdim=True)
             text_features /= text_features.norm(dim=-1, keepdim=True)
             similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
 
-            # Predicted label
+            #Predicted label
             predicted_label = similarity.argmax(dim=1).item()
 
-            # Display image and similarity scores
+            #Display image and similarity scores
             image_np = image.squeeze(0).permute(1, 2, 0).cpu().numpy()
             image_np = (image_np * np.array([0.26862954, 0.26130258, 0.27577711]) + np.array([0.48145466, 0.4578275, 0.40821073])) * 255
             image_np = image_np.astype(np.uint8)
@@ -565,9 +550,10 @@ def visualize_random_images(dataset, num_images=9):
     plt.savefig('fs_examples.png')
     plt.close()
 
-# Visualize random 9 images
+#Visualize random 9 images:
 #visualize_random_images(test_dataset)
 
+#Get image features 
 def get_features(dataloader):
     all_features = []
     all_labels = []
@@ -581,9 +567,11 @@ def get_features(dataloader):
 
     return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy()
 
+#Get test features
 test_features, test_labels = get_features(test_dataloader)
-#print('Test features created')
+print('Test features created')
 
+#Visualize features using PCA
 def visualize_features(features, labels, title):
     pca = PCA(n_components=2)
     reduced_features = pca.fit_transform(features)
@@ -591,7 +579,7 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('clip_fullysupervised_features_reduceplato_4p.png')
+    plt.savefig('clip_fullysupervised_features_5p.png')
     plt.close()
 
 visualize_features(test_features, test_labels, 'Test Features')
