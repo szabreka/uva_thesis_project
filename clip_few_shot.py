@@ -160,8 +160,8 @@ test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_n
 print('Datasets created')
 
 #Create dataloader fot training, validation and testig
-
-train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
+#for the trainings, the batch size was 4
+train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
 
 print('Dataloaders created')
@@ -182,7 +182,7 @@ num_epochs = 1
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
 #optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-optimizer = torch.optim.Adam(model.parameters(), lr=5e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+optimizer = torch.optim.Adam(model.parameters(), lr=5e-6,betas=(0.9,0.98),eps=1e-6,weight_decay=0.001)
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 # Specify the loss functions - for images and for texts

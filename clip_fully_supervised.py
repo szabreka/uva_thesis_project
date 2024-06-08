@@ -175,9 +175,11 @@ if device == "cpu":
 num_epochs = 25
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-7,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.01)
+#optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 #Different tried schedulers:
-#scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+#scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
 #scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
 #scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)
 
@@ -374,14 +376,14 @@ for epoch in range(num_epochs):
     if te_loss < best_te_loss:
         best_te_loss = te_loss
         best_ep = epoch
-        torch.save(model.state_dict(), "../fs_best_model_12p.pt")
+        torch.save(model.state_dict(), "../fs_best_model_1p.pt")
         early_stopping_counter = 0
     else:
         early_stopping_counter += 1
 
     #save last model
     print(f"epoch {epoch+1}, tr_loss {tr_loss}, te_loss {te_loss}")
-    torch.save(model.state_dict(), "../fs_last_model_12p.pt")
+    torch.save(model.state_dict(), "../fs_last_model_1p.pt")
 
     if (early_stopping_counter >= early_stopping_patience) or (best_te_loss<=early_stopping_threshold):
         print(f"Early stopping after {epoch + 1} epochs.")
@@ -579,7 +581,7 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('clip_fullysupervised_features_5p.png')
+    plt.savefig('clip_fullysupervised_features_cosine.png')
     plt.close()
 
 visualize_features(test_features, test_labels, 'Test Features')

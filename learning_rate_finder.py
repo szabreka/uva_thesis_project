@@ -161,10 +161,13 @@ criterion = nn.CrossEntropyLoss()
 def train_step(engine, batch):
     model.train()
     inputs, labels, true_label = batch
-    inputs, labels = inputs.to(device), true_label.to(device)
+    inputs = inputs.to(device)
     optimizer.zero_grad()
-    outputs, _ = model(inputs, clip.tokenize(class_names).to(device))
-    loss = criterion(outputs, labels)
+    text_inputs = clip.tokenize(class_names).to(device)
+    text_inputs = text_inputs.squeeze(dim = 1)
+    outputs, _ = model(inputs, text_inputs)
+    ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
+    loss = criterion(outputs, ground_truth)
     loss.backward()
     optimizer.step()
     return loss.item()
@@ -174,7 +177,7 @@ trainer = Engine(train_step)
 lr_finder = FastaiLRFinder()
 to_save = {"model": model, "optimizer": optimizer}
 
-with lr_finder.attach(trainer, to_save=to_save) as trainer_with_lr_finder:
+with lr_finder.attach(trainer, to_save=to_save, start_lr=1e-8, end_lr=10.0) as trainer_with_lr_finder:
     trainer_with_lr_finder.run(train_dataloader)
 
 # Get lr_finder results

@@ -66,7 +66,7 @@ class MobileNetV3Small_RNN(nn.Module):
             raise ValueError("Invalid RNN type. Choose 'LSTM' or 'GRU'.")
 
         #Dropout layer
-        #self.dropout = nn.Dropout(p=0.5)
+        self.dropout = nn.Dropout(p=0.5)
 
         #final classification layer - to get logits for the two classes
         self.fc = nn.Linear(256, num_classes)
@@ -89,7 +89,7 @@ class MobileNetV3Small_RNN(nn.Module):
         rnn_out, _ = self.rnn(features)
         
         #dropout layer
-        #rnn_out = self.dropout(rnn_out)
+        rnn_out = self.dropout(rnn_out)
 
         #batch, timesteps, output features
         #only select the last of the timesteps as it holds the information of the whole video
@@ -220,14 +220,14 @@ num_epochs = 50
 #optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
 #optimizer: third trainings:
 #optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, betas=(0.9,0.98),eps=1e-6,weight_decay=1e-4)
 loss = nn.CrossEntropyLoss()
 #second_option_scheduler:
 #scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
 #third_option_scheduler:
-#scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
 #4. option:
-scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
+#scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 

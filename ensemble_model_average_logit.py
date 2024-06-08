@@ -90,8 +90,8 @@ class MobileNetV3Small_RNN(nn.Module):
         
         return logits
     
-rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
-state_dict = torch.load('../cnn_rnn/light_cnn_last_model_gru_11e.pt', map_location=device)
+rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="LSTM")
+state_dict = torch.load('../cnn_rnn/light_cnn_last_lstm_7e_drop_lr5e-05.pt', map_location=device)
 state_dict = {k.partition('module.')[2] if k.startswith('module.') else k: v for k, v in state_dict.items()}
 rnn_model.load_state_dict(state_dict)
 rnn_model = rnn_model.to(device)
@@ -301,8 +301,8 @@ class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
         rnn_logits = self.mobilenet_rnn_model(frames)
 
         #combine the logits
-        #combined_logits = ( w_clip * logits_per_image + w_cnn * rnn_logits)/2
-        combined_logits = ( w_clip * logits_per_image * w_cnn * rnn_logits)
+        combined_logits = ( w_clip * logits_per_image + w_cnn * rnn_logits)/2
+        #combined_logits = ( w_clip * logits_per_image * w_cnn * rnn_logits)
 
         return combined_logits
 
