@@ -89,7 +89,7 @@ class MobileNetV3Small_RNN(nn.Module):
         rnn_out, _ = self.rnn(features)
         
         #dropout layer
-        rnn_out = self.dropout(rnn_out)
+        #rnn_out = self.dropout(rnn_out)
 
         #batch, timesteps, output features
         #only select the last of the timesteps as it holds the information of the whole video
@@ -165,9 +165,9 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
-train_data = load_data('data/split/metadata_train_split_by_date.json')
-val_data = load_data('data/split/metadata_validation_split_by_date.json')
-test_data = load_data('data/split/metadata_test_split_by_date.json')
+train_data = load_data('data/split/metadata_train_split_0_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_0_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_0_by_camera.json')
 
 # Prepare the list of video file paths and labels
 #Prepare the list of video file paths and labels
@@ -220,12 +220,12 @@ num_epochs = 50
 #optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
 #optimizer: third trainings:
 #optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, betas=(0.9,0.98),eps=1e-6,weight_decay=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=5e-4, betas=(0.9,0.98),eps=1e-6,weight_decay=1e-6)
 loss = nn.CrossEntropyLoss()
 #second_option_scheduler:
 #scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
 #third_option_scheduler:
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
+#scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
 #4. option:
 #scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
@@ -312,9 +312,6 @@ for epoch in range(num_epochs):
             all_preds.extend(pred_labels.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
-            # Append loss
-            val_losses.append(val_loss.item())
-        
             # Update the progress bar with the current epoch and loss
             vbar.set_description(f"Validation: {i}/{len(val_dataloader)}, Validation loss: {val_loss.item():.4f}")
             i+=1
@@ -326,7 +323,7 @@ for epoch in range(num_epochs):
     val_accuracies.append(val_accuracy)
     train_losses.append(te_loss)
     
-    scheduler.step(te_loss)
+    #scheduler.step(te_loss)
 
     # Calculate confusion matrix
     conf_matrix = confusion_matrix(all_labels, all_preds)
@@ -350,14 +347,14 @@ for epoch in range(num_epochs):
     if te_loss < best_te_loss:
         best_te_loss = te_loss
         best_ep = epoch
-        torch.save(model.state_dict(), "../light_cnn_best_model.pt")
+        torch.save(model.state_dict(), "../light_cnn_best_model_gru_s0.pt")
         early_stopping_counter = 0 
     else:
         early_stopping_counter += 1
 
     print(f"epoch {epoch}, tr_loss {tr_loss}, te_loss {te_loss}")
 
-    torch.save(model.state_dict(), "../light_cnn_last_model.pt")
+    torch.save(model.state_dict(), "../light_cnn_last_model_gru_s0.pt")
 
     if early_stopping_counter >= early_stopping_patience:
         print(f"Early stopping after {epoch + 1} epochs.")
@@ -414,7 +411,7 @@ print(f"Test Precision: {precision:.4f}")
 print(f"Test Recall: {recall:.4f}")
 print(f"Test F1 Score: {f_score:.4f}")
 
-print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
+print("Model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
 
 # Classification report
 target_names = ['class 0', 'class 1']

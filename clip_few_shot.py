@@ -122,8 +122,8 @@ test_list_labels = [int(label) for label in test_data['label']]
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
-class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
+class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
+#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
@@ -181,8 +181,9 @@ if device == "cpu":
 num_epochs = 1
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-#optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-optimizer = torch.optim.Adam(model.parameters(), lr=5e-6,betas=(0.9,0.98),eps=1e-6,weight_decay=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+#optimizer = torch.optim.Adam(model.parameters(), lr=5e-6,betas=(0.9,0.98),eps=1e-6,weight_decay=0.001)
+#optimizer = torch.optim.Adam(model.parameters(), lr=5e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.001)
 #scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 
 # Specify the loss functions - for images and for texts

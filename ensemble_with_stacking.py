@@ -92,8 +92,8 @@ class MobileNetV3Small_RNN(nn.Module):
         
         return logits
     
-rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
-state_dict = torch.load('../cnn_rnn/light_cnn_last_model_gru_11e.pt', map_location=device)
+rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="LSTM")
+state_dict = torch.load('../light_cnn_last_model_25r.pt', map_location=device)
 state_dict = {k.partition('module.')[2] if k.startswith('module.') else k: v for k, v in state_dict.items()}
 rnn_model.load_state_dict(state_dict)
 rnn_model = rnn_model.to(device)
@@ -101,11 +101,11 @@ rnn_model.eval()
 
 
 clip_model, preprocess = clip.load('ViT-B/16', device, jit=False)
-state_dict = torch.load('../clip_fully_supervised/fs_best_model_5e_5p.pt', map_location=device)
+state_dict = torch.load('../fs_best_model_61r.pt', map_location=device)
 clip_model.load_state_dict(state_dict)
 clip_model.eval()
 
-logreg_model = joblib.load('../clip_lin/final_logreg_model_last_5e5pbestmodel.sav')
+logreg_model = joblib.load('../uva_thesis_project/final_logreg_model_best_61r.sav')
 
 class ImageTitleDataset(Dataset):
     def __init__(self, list_video_path, list_labels, rnn_transform_image, clip_transform_image):
@@ -238,8 +238,8 @@ rnn_val_test_transform = transforms.Compose([
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
-class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
+class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
+#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8

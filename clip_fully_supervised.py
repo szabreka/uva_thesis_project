@@ -105,10 +105,13 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
-train_data = load_data('data/split/metadata_train_split_by_date.json')
+'''train_data = load_data('data/split/metadata_train_split_by_date.json')
 val_data = load_data('data/split/metadata_validation_split_by_date.json')
-test_data = load_data('data/split/metadata_test_split_by_date.json')
+test_data = load_data('data/split/metadata_test_split_by_date.json')'''
 
+train_data = load_data('data/split/metadata_train_split_0_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_0_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_0_by_camera.json')
 
 #Prepare the list of video file paths and labels
 def prepare_paths_labels(data, base_path):
@@ -172,15 +175,14 @@ if device == "cpu":
   model.float()
 
 #Define number of epochs
-num_epochs = 25
+num_epochs = 5
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.01)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.001)
 #optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 #Different tried schedulers:
 #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=5)
-#scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
+#scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
 #scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)
 
 

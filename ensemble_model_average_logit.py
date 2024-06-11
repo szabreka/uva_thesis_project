@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from torch.nn.parallel import DataParallel
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+import joblib
 
 # Define device
 if torch.cuda.is_available():
@@ -91,7 +92,7 @@ class MobileNetV3Small_RNN(nn.Module):
         return logits
     
 rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="LSTM")
-state_dict = torch.load('../cnn_rnn/light_cnn_last_lstm_7e_drop_lr5e-05.pt', map_location=device)
+state_dict = torch.load('../light_cnn_last_model_25r.pt', map_location=device)
 state_dict = {k.partition('module.')[2] if k.startswith('module.') else k: v for k, v in state_dict.items()}
 rnn_model.load_state_dict(state_dict)
 rnn_model = rnn_model.to(device)
@@ -99,9 +100,11 @@ rnn_model.eval()
 
 
 clip_model, preprocess = clip.load('ViT-B/16', device, jit=False)
-state_dict = torch.load('../clip_fully_supervised/fs_best_model_5e_5p.pt', map_location=device)
+state_dict = torch.load('../fs_best_model_61r.pt', map_location=device)
 clip_model.load_state_dict(state_dict)
 clip_model.eval()
+
+logreg_model = joblib.load('../uva_thesis_project/final_logreg_model_best_61r.sav')
 
 class ImageTitleDataset(Dataset):
     def __init__(self, list_video_path, list_labels, rnn_transform_image, clip_transform_image):
@@ -271,7 +274,7 @@ if device == "cpu":
   clip_model.float()
 
 class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
-    def __init__(self, clip_model, mobilenet_rnn_model, dataloader):
+    def __init__(self, clip_model, mobilenet_rnn_model):
         super(CLIP_MobileNetV3_RNN_Ensemble, self).__init__()
         #set the models
         self.clip_model = clip_model
@@ -282,13 +285,9 @@ class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
         for param in self.mobilenet_rnn_model.parameters():
             param.requires_grad = False
 
-        #dataloader with preprocessed videos
-        self.dataloader = dataloader
-
-    def forward(self, frames, label, image, classname, w_clip = 1,  w_cnn = 1, ):
+    def forward(self, frames, image, classname, w_clip = 1,  w_cnn = 1 ):
         #send all data to device
         images = image.to(device)
-        labels = label.to(device)
         frames = frames.to(device)
         #get clip logits
         text_inputs = clip.tokenize(classname,context_length=77, truncate=True).to(device)
@@ -306,7 +305,41 @@ class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
 
         return combined_logits
 
-ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model, test_dataloader)
+class CLIP_GLIN_MobileNetV3_RNN_Ensemble(nn.Module):
+    def __init__(self, clip_model, mobilenet_rnn_model, logreg_model):
+        super(CLIP_GLIN_MobileNetV3_RNN_Ensemble, self).__init__()
+        #set the models
+        self.clip_model = clip_model
+        self.mobilenet_rnn_model = mobilenet_rnn_model
+        self.logreg_model = logreg_model
+
+        for param in self.clip_model.parameters():
+            param.requires_grad = False
+        for param in self.mobilenet_rnn_model.parameters():
+            param.requires_grad = False
+
+
+    def forward(self, frames, image, classname, w_clip = 1,  w_cnn = 1 ):
+        #send all data to device
+        images = image.to(device)
+        frames = frames.to(device)
+        #get clip logits
+        features = self.clip_model.encode_image(images.to(device)).cpu().numpy()
+        clip_glin_pred = self.logreg_model.predict_proba(features)
+        clip_glin_pred = torch.tensor(clip_glin_pred).to(device)
+        #to get the logits instead of the probabilites (this is the formula to capture logits)
+        clip_glin_pred = torch.log(clip_glin_pred / (1 - clip_glin_pred))
+
+        #get mobilenet-rnn logits
+        rnn_logits = self.mobilenet_rnn_model(frames)
+
+        #combine logits
+        combined_logits = ( w_clip * clip_glin_pred + w_cnn * rnn_logits)/2
+
+        return combined_logits
+
+#ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
+ensemble_model = CLIP_GLIN_MobileNetV3_RNN_Ensemble(clip_model, rnn_model, logreg_model)
 
 def evaluate_model(model, dataloader, device):
     model.eval()
@@ -316,7 +349,7 @@ def evaluate_model(model, dataloader, device):
     with torch.no_grad():
         for frames, label, image in dataloader:
             
-            outputs = model(frames, label, image, class_names,  1 , 1)
+            outputs = model(frames, image, class_names,  1 , 1)
             _, preds = torch.max(outputs, 1)
             
             all_preds.extend(preds.cpu().numpy())
