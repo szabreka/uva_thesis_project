@@ -20,6 +20,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from datetime import datetime
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+import joblib
 
 # Define device
 if torch.cuda.is_available():
@@ -33,7 +34,7 @@ print('Used device: ', device)
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
-state_dict = torch.load('../fs_last_model_reduceplato_15e_4p.pt', map_location=device)
+state_dict = torch.load('../clip_splits/fs_best_model_s2.pt', map_location=device)
 model.load_state_dict(state_dict)
 
 # Load the dataset
@@ -51,7 +52,6 @@ class ImageTitleDataset(Dataset):
 
     @staticmethod
     #Function to create a square-shaped image from the video (similar to 1 long image)
-    #To do: what if the video has more frames than 36?
     def preprocess_video_to_image_grid_version(video_path, num_rows=6, num_cols=6):
         #Open the video file
         video = cv2.VideoCapture(video_path)
@@ -69,19 +69,21 @@ class ImageTitleDataset(Dataset):
                 frames.append(frame_rgb)
             video.release()
         
+        #If the video has a different amount of frames from 36, then produce a long image
         if len(frames) != 36:
             print("Num of frames are not 36")
             print("Num of frames for video on ", video_path, "is ", len(frames))
-        
-        # Create  and store rows in the grids
-        rows_list = []
-        for i in range(num_rows):
-            #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
-            row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
-            rows_list.append(row)
-        
-        # Concatenate grid vertically to create a single square-shaped image from the smoke video
-        concatenated_frames = np.concatenate(rows_list, axis=0)
+            concatenated_frames = np.concatenate(frames, axis=1)
+        else:
+            #Create  and store rows in the grids
+            rows_list = []
+            for i in range(num_rows):
+                #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
+                row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
+                rows_list.append(row)
+            
+            #Concatenate grid vertically to create a single square-shaped image from the smoke video
+            concatenated_frames = np.concatenate(rows_list, axis=0)
         return concatenated_frames
 
     def __len__(self):
@@ -93,27 +95,25 @@ class ImageTitleDataset(Dataset):
         image = self.preprocess_video_to_image_grid_version(video_path)
         image = Image.fromarray(image)
         image = self.transform_image(image)
-        #image = preprocess(image)
+
         #get the corresponding class names and tokenize
         true_label = self.labels[idx]
-        #label = self.class_names[true_label]
-        #label = clip.tokenize(label, context_length=77, truncate=True)
+
         return image, true_label
     
 #Define training, validation and test data
-# Load the JSON metadata
-with open('data/split/metadata_train_split_by_date.json', 'r') as f:
-    train_data = json.load(f)
-with open('data/split/metadata_validation_split_by_date.json', 'r') as f:
-    val_data = json.load(f)
-with open('data/split/metadata_test_split_by_date.json', 'r') as f:
-    test_data = json.load(f)
+def load_data(split_path):
+    with open(split_path, 'r') as f:
+        data = json.load(f)
+    return pd.DataFrame(data)
 
+'''train_data = load_data('data/split/metadata_train_split_by_date.json')
+val_data = load_data('data/split/metadata_validation_split_by_date.json')
+test_data = load_data('data/split/metadata_test_split_by_date.json')'''
 
-# Convert the datasets to a Pandas DataFrame
-train_data = pd.DataFrame(train_data)
-val_data = pd.DataFrame(val_data)
-test_data = pd.DataFrame(test_data)
+train_data = load_data('data/split/metadata_train_split_2_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_2_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_2_by_camera.json')
 
 
 # Prepare the list of video file paths and labels
@@ -154,7 +154,6 @@ test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, test_tr
 print('Datasets created')
 
 #Create dataloader fot training, validation and testig
-
 train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
@@ -230,8 +229,6 @@ print(f"Validation Recall = {val_recall:.3f}")
 print(f"Validation F1 Score = {val_f1:.3f}")
 
     
-
-
 start_time = datetime.now()
 # Evaluate the trained classifier on the test set
 test_predictions = classifier.predict(test_features)
@@ -256,3 +253,7 @@ print("Confusion Matrix:")
 print(conf_matrix)
 
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
+
+#save model
+filename = '../final_logreg_model_lin_best_s2.sav'
+joblib.dump(classifier, filename)

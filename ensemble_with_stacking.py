@@ -92,8 +92,8 @@ class MobileNetV3Small_RNN(nn.Module):
         
         return logits
     
-rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="LSTM")
-state_dict = torch.load('../light_cnn_last_model_25r.pt', map_location=device)
+rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
+state_dict = torch.load('../cnn_splits/light_cnn_last_model_gru_s5.pt', map_location=device)
 state_dict = {k.partition('module.')[2] if k.startswith('module.') else k: v for k, v in state_dict.items()}
 rnn_model.load_state_dict(state_dict)
 rnn_model = rnn_model.to(device)
@@ -101,11 +101,11 @@ rnn_model.eval()
 
 
 clip_model, preprocess = clip.load('ViT-B/16', device, jit=False)
-state_dict = torch.load('../fs_best_model_61r.pt', map_location=device)
+state_dict = torch.load('../clip_splits/fs_best_model_s5_5p5e.pt', map_location=device)
 clip_model.load_state_dict(state_dict)
 clip_model.eval()
 
-logreg_model = joblib.load('../uva_thesis_project/final_logreg_model_best_61r.sav')
+#logreg_model = joblib.load('../uva_thesis_project/final_logreg_model_best_61r.sav')
 
 class ImageTitleDataset(Dataset):
     def __init__(self, list_video_path, list_labels, rnn_transform_image, clip_transform_image):
@@ -175,18 +175,20 @@ class ImageTitleDataset(Dataset):
         return frames, label, image
     
 
-#Define training, validation and test data
-# Load the JSON metadata
-with open('data/split/metadata_train_split_by_date.json', 'r') as f:
-    train_data = json.load(f)
-with open('data/split/metadata_validation_split_by_date.json', 'r') as f:
-    val_data = json.load(f)
-with open('data/split/metadata_test_split_by_date.json', 'r') as f:
-    test_data = json.load(f)
 
-train_data = pd.DataFrame(train_data)
-val_data = pd.DataFrame(val_data)
-test_data = pd.DataFrame(test_data)
+#Define training, validation and test data
+def load_data(split_path):
+    with open(split_path, 'r') as f:
+        data = json.load(f)
+    return pd.DataFrame(data)
+
+'''train_data = load_data('data/split/metadata_train_split_by_date.json')
+val_data = load_data('data/split/metadata_validation_split_by_date.json')
+test_data = load_data('data/split/metadata_test_split_by_date.json')'''
+
+train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_4_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_4_by_camera.json')
 
 # Define input resolution
 input_resolution = (256, 256)
@@ -238,8 +240,8 @@ rnn_val_test_transform = transforms.Compose([
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
-#class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
+#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
+class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
 #class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
@@ -350,9 +352,9 @@ class CLIP_GLIN_MobileNetV3_RNN_Ensemble(nn.Module):
         return combined_data
 
 #simple clip model without lin layer:
-#ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
+ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
 #clip model with lin layer:
-ensemble_model = CLIP_GLIN_MobileNetV3_RNN_Ensemble(clip_model, rnn_model,logreg_model)
+#ensemble_model = CLIP_GLIN_MobileNetV3_RNN_Ensemble(clip_model, rnn_model,logreg_model)
 
 def get_features(model, dataloader):
     model.eval()

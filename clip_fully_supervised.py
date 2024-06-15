@@ -29,21 +29,19 @@ else:
     device = torch.device("cpu")
 print('Used device: ', device)
 
-#Load CLIP model - ViT B16 (need to pip install clip first)
+#Load CLIP model (need to pip install clip first)
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
 
 #Load the dataset
 class ImageTitleDataset(Dataset):
-    def __init__(self, list_video_path, list_labels, class_names, transform_image):
+    def __init__(self, list_video_path, list_labels, transform_image):
         #To handle the parent class
         super().__init__()
         #Initalize image paths and corresponding texts
         self.video_path = list_video_path
         #Initialize labels (0 or 1)
         self.labels = list_labels
-        #Initialize class names (no smoke or smoke in prompts)
-        self.class_names = class_names
         #Transform the image to the required tensor
         self.transform_image = transform_image
 
@@ -94,9 +92,8 @@ class ImageTitleDataset(Dataset):
         image = self.transform_image(image)
         #Get the corresponding class names and tokenize
         true_label = self.labels[idx]
-        label = self.class_names[true_label]
-        label = clip.tokenize(label, context_length=77, truncate=True)
-        return image, label, true_label
+    
+        return image, true_label
 
 
 #Define training, validation and test data
@@ -109,9 +106,9 @@ def load_data(split_path):
 val_data = load_data('data/split/metadata_validation_split_by_date.json')
 test_data = load_data('data/split/metadata_test_split_by_date.json')'''
 
-train_data = load_data('data/split/metadata_train_split_0_by_camera.json')
-val_data = load_data('data/split/metadata_validation_split_0_by_camera.json')
-test_data = load_data('data/split/metadata_test_split_0_by_camera.json')
+train_data = load_data('data/split/metadata_train_split_2_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_2_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_2_by_camera.json')
 
 #Prepare the list of video file paths and labels
 def prepare_paths_labels(data, base_path):
@@ -150,9 +147,9 @@ transform_steps = transforms.Compose([
 ])
 
 # Create dataset and data loader for training, validation and testing
-train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, class_names, transform_steps)
-val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, class_names, transform_steps)
-test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_names, transform_steps)
+train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, transform_steps)
+val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, transform_steps)
+test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, transform_steps)
 
 print('Datasets created')
 
@@ -175,11 +172,11 @@ if device == "cpu":
   model.float()
 
 #Define number of epochs
-num_epochs = 5
+num_epochs = 50
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.001)
 #optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.001)
 #Different tried schedulers:
 #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
@@ -213,7 +210,7 @@ for epoch in range(num_epochs):
         step += 1
 
         #Extact images, class_names and labels from batch
-        images, labels, true_label = batch 
+        images, true_label = batch 
 
         #Move images and texts to the specified device (CPU or GPU)
         images= images.to(device)
@@ -246,7 +243,7 @@ for epoch in range(num_epochs):
 
         #get correct and total predictions for training accuracy 
         correct = (predicted_label == ground_truth_label).sum().item()
-        total = len(labels)
+        total = len(true_label)
         epoch_train_correct += correct
         epoch_train_total += total
 
@@ -285,7 +282,7 @@ for epoch in range(num_epochs):
         for batch in vbar:
                 step += 1
                 #Extract images, class names and labels from the batch
-                images, labels, true_label = batch 
+                images, true_label = batch 
                 #Move images and texts to the specified device
                 images = images.to(device)
                 true_label = true_label.to(device)
@@ -314,7 +311,7 @@ for epoch in range(num_epochs):
                 ground_truth_label = ground_truth.cpu().numpy()
 
                 correct = (predicted_label == ground_truth_label).sum().item()
-                total = len(labels)
+                total = len(true_label)
                 epoch_val_correct += correct
                 epoch_val_total += total
 
@@ -378,14 +375,14 @@ for epoch in range(num_epochs):
     if te_loss < best_te_loss:
         best_te_loss = te_loss
         best_ep = epoch
-        torch.save(model.state_dict(), "../fs_best_model_1p.pt")
+        torch.save(model.state_dict(), "../fs_best_model_decay_s2.pt")
         early_stopping_counter = 0
     else:
         early_stopping_counter += 1
 
     #save last model
     print(f"epoch {epoch+1}, tr_loss {tr_loss}, te_loss {te_loss}")
-    torch.save(model.state_dict(), "../fs_last_model_1p.pt")
+    torch.save(model.state_dict(), "../fs_last_model_decay_s2.pt")
 
     if (early_stopping_counter >= early_stopping_patience) or (best_te_loss<=early_stopping_threshold):
         print(f"Early stopping after {epoch + 1} epochs.")
@@ -404,13 +401,11 @@ with torch.no_grad():
         i = 0
         for batch in tbar:
                 # Extract images and texts from the batch
-                images, labels, true_label = batch 
+                images, true_label = batch 
                 # Move images and texts to the specified device
                 images = images.to(device)
-                texts = labels.to(device)
                 true_label = true_label.to(device)
                 text_inputs = clip.tokenize(class_names).to(device)
-                texts = texts.squeeze(dim=1)
                 text_inputs.squeeze(dim=1)
 
                 # Forward pass
@@ -507,55 +502,6 @@ plt.title('Training and Validation Loss')
 plt.savefig('training_validation_loss_5p.png')
 plt.close()
 
-#Based on code provided by OpenAI
-def visualize_random_images(dataset, num_images=9):
-    #Select random indices
-    random_indices = random.sample(range(len(dataset)), num_images)
-    
-    #Prepare plot
-    fig, axes = plt.subplots(3, 3, figsize=(20, 14))
-    axes = axes.flatten()
-    
-    #Prepare CLIP model and text inputs
-    model.eval()
-    text_inputs = clip.tokenize(class_names).to(device)
-    
-    with torch.no_grad():
-        for i, idx in enumerate(random_indices):
-            #Get image, class_names, and true label
-            image, label, true_label = dataset[idx]
-            image = image.unsqueeze(0).to(device)
-            texts = label.to(device)
-            texts = texts.squeeze(dim=1)
-            text_inputs.squeeze(dim=1)
-
-            #Calculate features
-            image_features = model.encode_image(image)
-            text_features = model.encode_text(text_inputs)
-
-            #Calculate similarity
-            image_features /= image_features.norm(dim=-1, keepdim=True)
-            text_features /= text_features.norm(dim=-1, keepdim=True)
-            similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
-
-            #Predicted label
-            predicted_label = similarity.argmax(dim=1).item()
-
-            #Display image and similarity scores
-            image_np = image.squeeze(0).permute(1, 2, 0).cpu().numpy()
-            image_np = (image_np * np.array([0.26862954, 0.26130258, 0.27577711]) + np.array([0.48145466, 0.4578275, 0.40821073])) * 255
-            image_np = image_np.astype(np.uint8)
-
-            axes[i].imshow(image_np)
-            axes[i].axis('off')
-            axes[i].set_title(f"True: {class_names[true_label]}\nPred: {class_names[predicted_label]}", fontsize=14)
-
-    plt.tight_layout()
-    plt.savefig('fs_examples.png')
-    plt.close()
-
-#Visualize random 9 images:
-#visualize_random_images(test_dataset)
 
 #Get image features 
 def get_features(dataloader):
@@ -563,7 +509,7 @@ def get_features(dataloader):
     all_labels = []
     
     with torch.no_grad():
-        for images, class_names, labels  in dataloader:
+        for images, labels  in dataloader:
             features = model.encode_image(images.to(device))
 
             all_features.append(features)
@@ -583,7 +529,7 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('clip_fullysupervised_features_cosine.png')
+    plt.savefig('clip_fullysupervised_features.png')
     plt.close()
 
 visualize_features(test_features, test_labels, 'Test Features')

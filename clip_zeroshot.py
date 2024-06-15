@@ -26,8 +26,8 @@ start_time = datetime.now()
 # Define device
 if torch.cuda.is_available():
     device = torch.device("cuda") # use CUDA device
-#elif torch.backends.mps.is_available():
-#    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
+elif torch.backends.mps.is_available():
+    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
 else:
     device = torch.device("cpu") # use CPU device
 
@@ -96,7 +96,6 @@ class ImageTitleDataset(Dataset):
         image = self.preprocess_video_to_image_grid_version(video_path)
         image = Image.fromarray(image)
         image = self.transform_image(image)
-        #image = preprocess(image)
         #get the corresponding class names and tokenize
         true_label = self.labels[idx]
         label = self.class_names[true_label]

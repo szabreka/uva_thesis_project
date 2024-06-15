@@ -165,9 +165,9 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
-train_data = load_data('data/split/metadata_train_split_0_by_camera.json')
-val_data = load_data('data/split/metadata_validation_split_0_by_camera.json')
-test_data = load_data('data/split/metadata_test_split_0_by_camera.json')
+train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_4_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_4_by_camera.json')
 
 # Prepare the list of video file paths and labels
 #Prepare the list of video file paths and labels
@@ -323,7 +323,8 @@ for epoch in range(num_epochs):
     val_accuracies.append(val_accuracy)
     train_losses.append(te_loss)
     
-    #scheduler.step(te_loss)
+    #scheduler
+    #scheduler.step(te_loss) #- m
 
     # Calculate confusion matrix
     conf_matrix = confusion_matrix(all_labels, all_preds)
@@ -347,14 +348,14 @@ for epoch in range(num_epochs):
     if te_loss < best_te_loss:
         best_te_loss = te_loss
         best_ep = epoch
-        torch.save(model.state_dict(), "../light_cnn_best_model_gru_s0.pt")
+        torch.save(model.state_dict(), "../light_cnn_best_model_gru_s5.pt")
         early_stopping_counter = 0 
     else:
         early_stopping_counter += 1
 
     print(f"epoch {epoch}, tr_loss {tr_loss}, te_loss {te_loss}")
 
-    torch.save(model.state_dict(), "../light_cnn_last_model_gru_s0.pt")
+    torch.save(model.state_dict(), "../light_cnn_last_model_gru_s5.pt")
 
     if early_stopping_counter >= early_stopping_patience:
         print(f"Early stopping after {epoch + 1} epochs.")

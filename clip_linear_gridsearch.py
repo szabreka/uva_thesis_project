@@ -35,28 +35,24 @@ print('Used device: ', device)
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
-#state_dict = torch.load('../clip_fully_supervised/fs_best_model_11e_4p.pt', map_location=device)
-state_dict = torch.load('../fs_last_model_60r.pt', map_location=device)
+#Load saved model weights
+state_dict = torch.load('../clip_splits/fs_best_model_s2.pt', map_location=device)
 model.load_state_dict(state_dict)
 
-# Load the dataset
+#Define dataset class
 class ImageTitleDataset(Dataset):
-    def __init__(self, list_video_path, list_labels, class_names, transform_image):
-        #to handle the parent class
+    def __init__(self, list_video_path, list_labels, transform_image):
+        #To handle the parent class
         super().__init__()
         #Initalize image paths and corresponding texts
         self.video_path = list_video_path
         #Initialize labels (0 or 1)
         self.labels = list_labels
-        #Initialize class names (no smoke or smoke)
-        self.class_names = class_names
         #Transform to tensor
-        #self.transforms = ToTensor()
         self.transform_image = transform_image
 
     @staticmethod
     #Function to create a square-shaped image from the video (similar to 1 long image)
-    #To do: what if the video has more frames than 36?
     def preprocess_video_to_image_grid_version(video_path, num_rows=6, num_cols=6):
         #Open the video file
         video = cv2.VideoCapture(video_path)
@@ -74,19 +70,21 @@ class ImageTitleDataset(Dataset):
                 frames.append(frame_rgb)
             video.release()
         
+        #If the video has a different amount of frames from 36, then produce a long image
         if len(frames) != 36:
             print("Num of frames are not 36")
             print("Num of frames for video on ", video_path, "is ", len(frames))
-        
-        # Create  and store rows in the grids
-        rows_list = []
-        for i in range(num_rows):
-            #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
-            row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
-            rows_list.append(row)
-        
-        # Concatenate grid vertically to create a single square-shaped image from the smoke video
-        concatenated_frames = np.concatenate(rows_list, axis=0)
+            concatenated_frames = np.concatenate(frames, axis=1)
+        else:
+            #Create  and store rows in the grids
+            rows_list = []
+            for i in range(num_rows):
+                #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
+                row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
+                rows_list.append(row)
+            
+            #Concatenate grid vertically to create a single square-shaped image from the smoke video
+            concatenated_frames = np.concatenate(rows_list, axis=0)
         return concatenated_frames
 
     def __len__(self):
@@ -98,27 +96,25 @@ class ImageTitleDataset(Dataset):
         image = self.preprocess_video_to_image_grid_version(video_path)
         image = Image.fromarray(image)
         image = self.transform_image(image)
-        #image = preprocess(image)
         #get the corresponding class names and tokenize
         true_label = self.labels[idx]
-        label = self.class_names[true_label]
-        label = clip.tokenize(label, context_length=77, truncate=True)
-        return image, label, true_label
+
+        return image, true_label
     
 #Define training, validation and test data
-# Load the JSON metadata
-with open('data/split/metadata_train_split_by_date.json', 'r') as f:
-    train_data = json.load(f)
-with open('data/split/metadata_validation_split_by_date.json', 'r') as f:
-    val_data = json.load(f)
-with open('data/split/metadata_test_split_by_date.json', 'r') as f:
-    test_data = json.load(f)
+#Define training, validation and test data
+def load_data(split_path):
+    with open(split_path, 'r') as f:
+        data = json.load(f)
+    return pd.DataFrame(data)
 
+'''train_data = load_data('data/split/metadata_train_split_by_date.json')
+val_data = load_data('data/split/metadata_validation_split_by_date.json')
+test_data = load_data('data/split/metadata_test_split_by_date.json')'''
 
-# Convert the datasets to a Pandas DataFrame
-train_data = pd.DataFrame(train_data)
-val_data = pd.DataFrame(val_data)
-test_data = pd.DataFrame(test_data)
+train_data = load_data('data/split/metadata_train_split_2_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_2_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_2_by_camera.json')
 
 
 # Prepare the list of video file paths and labels
@@ -128,19 +124,6 @@ val_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/
 val_list_labels = [int(label) for label in val_data['label']]
 test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
 test_list_labels = [int(label) for label in test_data['label']]
-
-#Define class names in a list - it needs prompt engineering
-#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
-#class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
-#class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
-class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
-#class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
-#class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
-#class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
-#class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
-#class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
-#class_names = ['no smoke', 'smoke']
 
 # Define input resolution
 input_resolution = (224, 224)
@@ -165,9 +148,9 @@ test_transform = transforms.Compose([
 ])
 
 # Create dataset and data loader for training, validation and testing
-train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, class_names, train_transform)
-val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, class_names, val_transform)
-test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, class_names, test_transform)
+train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, train_transform)
+val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, val_transform)
+test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, test_transform)
 
 print('Datasets created')
 
@@ -184,7 +167,7 @@ def get_features(dataloader, name):
     all_labels = []
     
     with torch.no_grad():
-        for images, classes, labels  in dataloader:
+        for images, labels  in dataloader:
             features = model.encode_image(images.to(device))
             all_features.append(features)
             all_labels.append(labels)
@@ -193,6 +176,7 @@ def get_features(dataloader, name):
     labels = torch.cat(all_labels).cpu().numpy()
     return features, labels
 
+#Get features
 train_features, train_labels = get_features(train_dataloader, 'Train')
 print('Train feaures created')
 val_features, val_labels = get_features(val_dataloader, 'Validation')
@@ -200,6 +184,7 @@ print('Validation features created')
 test_features, test_labels = get_features(test_dataloader, 'Test')
 print('Test features created')
 
+#Function to visualize features in 2d space
 def visualize_features(features, labels, title):
     pca = PCA(n_components=2)
     reduced_features = pca.fit_transform(features)
@@ -212,8 +197,9 @@ def visualize_features(features, labels, title):
 
 #visualize_features(test_features, test_labels, 'Test Features')
 
+#parameter grid for grid search
 param_grid = {
-    'penalty': ['none','l1','l2'],
+    'penalty': [None,'l1','l2'],
     'C': np.logspace(-3, 3, 100)
 }
 
@@ -273,5 +259,5 @@ print(classification_report(test_labels, test_predictions, target_names=target_n
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
 
 #save model
-filename = 'final_logreg_model_last_reduceplato.sav'
+filename = '../final_logreg_model_grid_best_s2.sav'
 joblib.dump(best_classifier, filename)
