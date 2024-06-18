@@ -30,8 +30,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 # Define device
 if torch.cuda.is_available():
     device = torch.device("cuda") # use CUDA device
-#elif torch.backends.mps.is_available():
-#    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
+elif torch.backends.mps.is_available():
+    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
 else:
     device = torch.device("cpu") # use CPU device
 print('Used device: ', device)
@@ -165,9 +165,13 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
-train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
+train_data = load_data('data/split/metadata_train_split_by_date.json')
+val_data = load_data('data/split/metadata_validation_split_by_date.json')
+test_data = load_data('data/split/metadata_test_split_by_date.json')
+
+'''train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
 val_data = load_data('data/split/metadata_validation_split_4_by_camera.json')
-test_data = load_data('data/split/metadata_test_split_4_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_4_by_camera.json')'''
 
 # Prepare the list of video file paths and labels
 #Prepare the list of video file paths and labels
@@ -348,14 +352,14 @@ for epoch in range(num_epochs):
     if te_loss < best_te_loss:
         best_te_loss = te_loss
         best_ep = epoch
-        torch.save(model.state_dict(), "../light_cnn_best_model_gru_s5.pt")
+        torch.save(model.state_dict(), "../light_cnn_best_model_gru_s3.pt")
         early_stopping_counter = 0 
     else:
         early_stopping_counter += 1
 
     print(f"epoch {epoch}, tr_loss {tr_loss}, te_loss {te_loss}")
 
-    torch.save(model.state_dict(), "../light_cnn_last_model_gru_s5.pt")
+    torch.save(model.state_dict(), "../light_cnn_last_model_gru_s3.pt")
 
     if early_stopping_counter >= early_stopping_patience:
         print(f"Early stopping after {epoch + 1} epochs.")

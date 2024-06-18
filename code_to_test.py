@@ -24,17 +24,18 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from torch.nn.parallel import DataParallel
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from sklearn.linear_model import LogisticRegression
 import joblib
 
 start_time = datetime.now()
 
 # Define device
 if torch.cuda.is_available():
-    device = torch.device("cuda")
+    device = torch.device("cuda") # use CUDA device
 elif torch.backends.mps.is_available():
-    device = torch.device("mps") 
+    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
 else:
-    device = torch.device("cpu")
+    device = torch.device("cpu") # use CPU device
 print('Used device: ', device)
 
 class MobileNetV3Small_RNN(nn.Module):
@@ -93,8 +94,8 @@ class MobileNetV3Small_RNN(nn.Module):
         
         return logits
     
-rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
-state_dict = torch.load('../cnn_splits/light_cnn_best_model_gru_s5.pt', map_location=device)
+rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="LSTM")
+state_dict = torch.load('../cnn_splits/light_cnn_best_model_lstm_s3.pt', map_location=device)
 state_dict = {k.partition('module.')[2] if k.startswith('module.') else k: v for k, v in state_dict.items()}
 rnn_model.load_state_dict(state_dict)
 rnn_model = rnn_model.to(device)
@@ -102,7 +103,7 @@ rnn_model.eval()
 
 
 clip_model, preprocess = clip.load('ViT-B/16', device, jit=False)
-state_dict = torch.load('../clip_splits/fs_best_model_s5_cosine.pt', map_location=device)
+state_dict = torch.load('../clip_splits/fs_last_model_reducelr_s3.pt', map_location=device)
 clip_model.load_state_dict(state_dict)
 clip_model.eval()
 
@@ -176,15 +177,12 @@ class ImageTitleDataset(Dataset):
         return frames, label, image
     
 
+
 #Define training, validation and test data
 def load_data(split_path):
     with open(split_path, 'r') as f:
         data = json.load(f)
     return pd.DataFrame(data)
-
-'''test_data = load_data('data/split/metadata_test_split_by_date.json')'''
-
-test_data = load_data('data/split/metadata_test_split_4_by_camera.json')
 
 # Define input resolution
 input_resolution = (256, 256)
@@ -195,22 +193,8 @@ val_test_transform = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# Prepare the list of video file paths and labels
-test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
-test_list_labels = [int(label) for label in test_data['label']]
-
 # Define input resolution
 rnn_input_resolution = (256, 256)
-
-# Define the transformation pipeline - from CLIP preprocessor without random crop augmentation, with extra data augmentation steps from RISE
-rnn_train_transform = transforms.Compose([
-    transforms.Resize(rnn_input_resolution, interpolation=Image.BICUBIC),
-    transforms.RandomHorizontalFlip(p=0.3),
-    transforms.RandomPerspective(distortion_scale=0.3, p=0.3),
-    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
 
 rnn_val_test_transform = transforms.Compose([
     transforms.Resize(rnn_input_resolution, interpolation=Image.BICUBIC),
@@ -222,7 +206,7 @@ rnn_val_test_transform = transforms.Compose([
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
+#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #- 4
 class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
 #class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
 #class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
@@ -241,13 +225,6 @@ clip_transform_steps = transforms.Compose([
     transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711])
 ])
 
-# Create dataset and data loader for training, validation and testing
-test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, rnn_val_test_transform, clip_transform_steps)
-
-print('Dataset created')
-
-test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-print('Dataloader created')
 
 def convert_models_to_fp32(model): 
     for p in model.parameters(): 
@@ -270,25 +247,27 @@ class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
         for param in self.mobilenet_rnn_model.parameters():
             param.requires_grad = False
 
-    def forward(self, frames, image, classname, w_clip = 1,  w_cnn = 1 ):
+
+    def forward(self, frames, image, classname):
         #send all data to device
         images = image.to(device)
         frames = frames.to(device)
         #get clip logits
         text_inputs = clip.tokenize(classname,context_length=77, truncate=True).to(device)
-        print('images', images.shape)
-        print('text', text_inputs.shape)
         #text_inputs.squeeze(dim=1)
         logits_per_image, logits_per_text = self.clip_model(images, text_inputs)
 
         #get mobilenet-rnn logits
         rnn_logits = self.mobilenet_rnn_model(frames)
 
-        #combine the logits
-        combined_logits = ( w_clip * logits_per_image + w_cnn * rnn_logits)/2
-        #combined_logits = ( w_clip * logits_per_image * w_cnn * rnn_logits)
+        # Ensure data types for concatenation
+        logits_per_image = logits_per_image.float()
+        rnn_logits = rnn_logits.float()
 
-        return combined_logits
+        #combine logits
+        combined_data = torch.cat((logits_per_image, rnn_logits), dim=1)
+
+        return combined_data
 
 class CLIP_GLIN_MobileNetV3_RNN_Ensemble(nn.Module):
     def __init__(self, clip_model, mobilenet_rnn_model, logreg_model):
@@ -304,7 +283,7 @@ class CLIP_GLIN_MobileNetV3_RNN_Ensemble(nn.Module):
             param.requires_grad = False
 
 
-    def forward(self, frames, image, classname, w_clip = 1,  w_cnn = 1 ):
+    def forward(self, frames, image, classname):
         #send all data to device
         images = image.to(device)
         frames = frames.to(device)
@@ -318,13 +297,48 @@ class CLIP_GLIN_MobileNetV3_RNN_Ensemble(nn.Module):
         #get mobilenet-rnn logits
         rnn_logits = self.mobilenet_rnn_model(frames)
 
+        # Ensure data types for concatenation
+        clip_glin_pred = clip_glin_pred.float()
+        rnn_logits = rnn_logits.float()
+
         #combine logits
-        combined_logits = ( w_clip * clip_glin_pred + w_cnn * rnn_logits)/2
+        combined_data = torch.cat((clip_glin_pred, rnn_logits), dim=1)
 
-        return combined_logits
+        return combined_data
 
+#simple clip model without lin layer:
 ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
-#ensemble_model = CLIP_GLIN_MobileNetV3_RNN_Ensemble(clip_model, rnn_model, logreg_model)
+#clip model with lin layer:
+#ensemble_model = CLIP_GLIN_MobileNetV3_RNN_Ensemble(clip_model, rnn_model,logreg_model)
+
+
+#test_data = load_data('data/split/metadata_test_split_4_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_by_date.json')
+
+test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
+test_list_labels = [int(label) for label in test_data['label']]
+test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, rnn_val_test_transform, clip_transform_steps)
+test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+
+def get_features(model, dataloader):
+    model.eval()
+    all_features = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for frames, label, image in dataloader:
+            
+            features = model(frames, image, class_names)
+            all_features.extend(features.cpu().numpy())
+            all_labels.extend(label.cpu().numpy())
+    
+    return all_features, all_labels
+
+
+meta_model = joblib.load('../logreg_model_ensemble_stacking_lstm_s3.sav')
+
+
 
 def evaluate_model(model, dataloader, device):
     model.eval()
@@ -332,13 +346,12 @@ def evaluate_model(model, dataloader, device):
     all_labels = []
     
     with torch.no_grad():
-        for frames, label, image in dataloader:
             
-            outputs = model(frames, image, class_names,  1 , 1)
-            _, preds = torch.max(outputs, 1)
+            test_preds, test_labels = get_features(model, dataloader)
+            meta_preds = meta_model.predict(test_preds)
             
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(label.cpu().numpy())
+            all_preds.extend(meta_preds)
+            all_labels.extend(test_labels)
     
     accuracy = accuracy_score(all_labels, all_preds)
     precision = precision_score(all_labels, all_preds, average='binary')
@@ -354,6 +367,7 @@ print(f"Test Precision: {precision:.4f}")
 print(f"Test Recall: {recall:.4f}")
 print(f"Test F1 Score: {f1:.4f}")
 
+
 end_time = datetime.now()
 print('Start time: ', start_time)
 print('Ending time: ', end_time)
@@ -367,6 +381,9 @@ print("Number of trainable parameters in RNN model: ", count_parameters(rnn_mode
 
 # Count parameters of the CLIP model
 print("Number of trainable parameters in CLIP model: ", count_parameters(clip_model))
+
+# Count parameters of the CLIP model
+print("Number of trainable parameters in Logreg model: ", meta_model.coef_.size)
 
 # Count parameters of the ensemble model
 ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)

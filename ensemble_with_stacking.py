@@ -27,11 +27,13 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.linear_model import LogisticRegression
 import joblib
 
+start_time = datetime.now()
+
 # Define device
 if torch.cuda.is_available():
     device = torch.device("cuda") # use CUDA device
-#elif torch.backends.mps.is_available():
-#    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
+elif torch.backends.mps.is_available():
+    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
 else:
     device = torch.device("cpu") # use CPU device
 print('Used device: ', device)
@@ -93,7 +95,7 @@ class MobileNetV3Small_RNN(nn.Module):
         return logits
     
 rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
-state_dict = torch.load('../cnn_splits/light_cnn_last_model_gru_s5.pt', map_location=device)
+state_dict = torch.load('../cnn_splits/light_cnn_best_model_gru_s3.pt', map_location=device)
 state_dict = {k.partition('module.')[2] if k.startswith('module.') else k: v for k, v in state_dict.items()}
 rnn_model.load_state_dict(state_dict)
 rnn_model = rnn_model.to(device)
@@ -101,7 +103,7 @@ rnn_model.eval()
 
 
 clip_model, preprocess = clip.load('ViT-B/16', device, jit=False)
-state_dict = torch.load('../clip_splits/fs_best_model_s5_5p5e.pt', map_location=device)
+state_dict = torch.load('../clip_splits/fs_last_model_s3_cosine.pt', map_location=device)
 clip_model.load_state_dict(state_dict)
 clip_model.eval()
 
@@ -182,13 +184,11 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
-'''train_data = load_data('data/split/metadata_train_split_by_date.json')
+train_data = load_data('data/split/metadata_train_split_by_date.json')
 val_data = load_data('data/split/metadata_validation_split_by_date.json')
-test_data = load_data('data/split/metadata_test_split_by_date.json')'''
 
-train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
-val_data = load_data('data/split/metadata_validation_split_4_by_camera.json')
-test_data = load_data('data/split/metadata_test_split_4_by_camera.json')
+'''train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_4_by_camera.json')'''
 
 # Define input resolution
 input_resolution = (256, 256)
@@ -214,8 +214,6 @@ train_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_video
 train_list_labels = [int(label) for label in train_data['label']]
 val_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in val_data['file_name']]
 val_list_labels = [int(label) for label in val_data['label']]
-test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
-test_list_labels = [int(label) for label in test_data['label']]
 
 # Define input resolution
 rnn_input_resolution = (256, 256)
@@ -262,13 +260,10 @@ clip_transform_steps = transforms.Compose([
 # Create dataset and data loader for training, validation and testing
 train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, rnn_train_transform ,clip_transform_steps)
 val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, rnn_val_test_transform, clip_transform_steps)
-test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, rnn_val_test_transform, clip_transform_steps)
-
 print('Datasets created')
 
 train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 print('Dataloaders created')
 
 def convert_models_to_fp32(model): 
@@ -356,6 +351,16 @@ ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
 #clip model with lin layer:
 #ensemble_model = CLIP_GLIN_MobileNetV3_RNN_Ensemble(clip_model, rnn_model,logreg_model)
 
+
+#test_data = load_data('data/split/metadata_test_split_4_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_by_date.json')
+
+test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
+test_list_labels = [int(label) for label in test_data['label']]
+test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, rnn_val_test_transform, clip_transform_steps)
+test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
+
 def get_features(model, dataloader):
     model.eval()
     all_features = []
@@ -401,3 +406,28 @@ print(f"Test Accuracy: {accuracy:.4f}")
 print(f"Test Precision: {precision:.4f}")
 print(f"Test Recall: {recall:.4f}")
 print(f"Test F1 Score: {f1:.4f}")
+
+end_time = datetime.now()
+print('Start time: ', start_time)
+print('Ending time: ', end_time)
+print('Overall time: ', end_time-start_time)
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters())
+
+# Count parameters of the RNN model
+print("Number of trainable parameters in RNN model: ", count_parameters(rnn_model))
+
+# Count parameters of the CLIP model
+print("Number of trainable parameters in CLIP model: ", count_parameters(clip_model))
+
+# Count parameters of the CLIP model
+print("Number of trainable parameters in Logreg model: ", meta_model.coef_.size)
+
+# Count parameters of the ensemble model
+ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
+print("Number of trainable parameters in ensemble model: ", count_parameters(ensemble_model))
+
+#save logreg model
+#filename = '../logreg_model_ensemble_stacking_lstm_s3.sav'
+#joblib.dump(meta_model, filename)

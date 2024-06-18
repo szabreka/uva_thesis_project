@@ -36,7 +36,7 @@ print('Used device: ', device)
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
 #Load saved model weights
-state_dict = torch.load('../clip_splits/fs_best_model_s2.pt', map_location=device)
+state_dict = torch.load('../clip_splits/fs_best_model_reducelr_s3.pt', map_location=device)
 model.load_state_dict(state_dict)
 
 #Define dataset class
@@ -108,13 +108,13 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
-'''train_data = load_data('data/split/metadata_train_split_by_date.json')
+train_data = load_data('data/split/metadata_train_split_by_date.json')
 val_data = load_data('data/split/metadata_validation_split_by_date.json')
-test_data = load_data('data/split/metadata_test_split_by_date.json')'''
+test_data = load_data('data/split/metadata_test_split_by_date.json')
 
-train_data = load_data('data/split/metadata_train_split_2_by_camera.json')
-val_data = load_data('data/split/metadata_validation_split_2_by_camera.json')
-test_data = load_data('data/split/metadata_test_split_2_by_camera.json')
+'''train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_4_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_4_by_camera.json')'''
 
 
 # Prepare the list of video file paths and labels
@@ -259,5 +259,5 @@ print(classification_report(test_labels, test_predictions, target_names=target_n
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
 
 #save model
-filename = '../final_logreg_model_grid_best_s2.sav'
+filename = '../final_logreg_model_reducelr_grid_best_s3.sav'
 joblib.dump(best_classifier, filename)

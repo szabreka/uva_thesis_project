@@ -102,13 +102,13 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
-'''train_data = load_data('data/split/metadata_train_split_by_date.json')
+train_data = load_data('data/split/metadata_train_split_by_date.json')
 val_data = load_data('data/split/metadata_validation_split_by_date.json')
-test_data = load_data('data/split/metadata_test_split_by_date.json')'''
+test_data = load_data('data/split/metadata_test_split_by_date.json')
 
-train_data = load_data('data/split/metadata_train_split_2_by_camera.json')
-val_data = load_data('data/split/metadata_validation_split_2_by_camera.json')
-test_data = load_data('data/split/metadata_test_split_2_by_camera.json')
+'''train_data = load_data('data/split/metadata_train_split_3_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_3_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_3_by_camera.json')'''
 
 #Prepare the list of video file paths and labels
 def prepare_paths_labels(data, base_path):
@@ -172,11 +172,11 @@ if device == "cpu":
   model.float()
 
 #Define number of epochs
-num_epochs = 50
+num_epochs = 5
 
 # Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
 #optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.001)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
 #Different tried schedulers:
 #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
 #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
@@ -195,6 +195,32 @@ train_accuracies = []
 val_accuracies = []
 train_losses = []
 val_losses = []
+
+#Get image features 
+def get_features(dataloader):
+    all_features = []
+    all_labels = []
+    
+    with torch.no_grad():
+        for images, labels  in dataloader:
+            features = model.encode_image(images.to(device))
+
+            all_features.append(features)
+            all_labels.append(labels)
+
+    return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy()
+
+
+#Visualize features using PCA
+def visualize_features(features, labels, title, epoch):
+    pca = PCA(n_components=2)
+    reduced_features = pca.fit_transform(features)
+    plt.figure(figsize=(10, 7))
+    plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
+    plt.colorbar()
+    plt.title(title)
+    plt.savefig(f'clip_fullysupervised_features_{epoch}.png')
+    plt.close()
 
 #Model training
 print('starts training')
@@ -371,18 +397,22 @@ for epoch in range(num_epochs):
     print(f"Validation Recall: {recall:.4f}")
     print(f"Validation F1 Score: {f_score:.4f}")
 
+    test_features, test_labels = get_features(test_dataloader)
+    print('Test features created')
+    visualize_features(test_features, test_labels, 'Test Features', epoch)
+
     #save best model and set the value of early stopping counter based loss
     if te_loss < best_te_loss:
         best_te_loss = te_loss
         best_ep = epoch
-        torch.save(model.state_dict(), "../fs_best_model_decay_s2.pt")
+        #torch.save(model.state_dict(), "../fs_best_model_reducelr_s3.pt")
         early_stopping_counter = 0
     else:
         early_stopping_counter += 1
 
     #save last model
     print(f"epoch {epoch+1}, tr_loss {tr_loss}, te_loss {te_loss}")
-    torch.save(model.state_dict(), "../fs_last_model_decay_s2.pt")
+    #torch.save(model.state_dict(), "../fs_last_model_reducelr_s3.pt")
 
     if (early_stopping_counter >= early_stopping_patience) or (best_te_loss<=early_stopping_threshold):
         print(f"Early stopping after {epoch + 1} epochs.")
@@ -503,33 +533,3 @@ plt.savefig('training_validation_loss_5p.png')
 plt.close()
 
 
-#Get image features 
-def get_features(dataloader):
-    all_features = []
-    all_labels = []
-    
-    with torch.no_grad():
-        for images, labels  in dataloader:
-            features = model.encode_image(images.to(device))
-
-            all_features.append(features)
-            all_labels.append(labels)
-
-    return torch.cat(all_features).cpu().numpy(), torch.cat(all_labels).cpu().numpy()
-
-#Get test features
-test_features, test_labels = get_features(test_dataloader)
-print('Test features created')
-
-#Visualize features using PCA
-def visualize_features(features, labels, title):
-    pca = PCA(n_components=2)
-    reduced_features = pca.fit_transform(features)
-    plt.figure(figsize=(10, 7))
-    plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
-    plt.colorbar()
-    plt.title(title)
-    plt.savefig('clip_fullysupervised_features.png')
-    plt.close()
-
-visualize_features(test_features, test_labels, 'Test Features')

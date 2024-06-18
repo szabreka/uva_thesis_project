@@ -25,8 +25,8 @@ import joblib
 # Define device
 if torch.cuda.is_available():
     device = torch.device("cuda") # use CUDA device
-#elif torch.backends.mps.is_available():
-#    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
+elif torch.backends.mps.is_available():
+    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
 else:
     device = torch.device("cpu") # use CPU device
 print('Used device: ', device)
@@ -34,7 +34,7 @@ print('Used device: ', device)
 #Load CLIP model - ViT B32
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
-state_dict = torch.load('../clip_splits/fs_best_model_s2.pt', map_location=device)
+state_dict = torch.load('../clip_splits/fs_last_model_decay_s3.pt', map_location=device)
 model.load_state_dict(state_dict)
 
 # Load the dataset
@@ -107,13 +107,13 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
-'''train_data = load_data('data/split/metadata_train_split_by_date.json')
+train_data = load_data('data/split/metadata_train_split_by_date.json')
 val_data = load_data('data/split/metadata_validation_split_by_date.json')
-test_data = load_data('data/split/metadata_test_split_by_date.json')'''
+test_data = load_data('data/split/metadata_test_split_by_date.json')
 
-train_data = load_data('data/split/metadata_train_split_2_by_camera.json')
-val_data = load_data('data/split/metadata_validation_split_2_by_camera.json')
-test_data = load_data('data/split/metadata_test_split_2_by_camera.json')
+'''train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
+val_data = load_data('data/split/metadata_validation_split_4_by_camera.json')
+test_data = load_data('data/split/metadata_test_split_4_by_camera.json')'''
 
 
 # Prepare the list of video file paths and labels
@@ -149,14 +149,13 @@ test_transform = transforms.Compose([
 # Create dataset and data loader for training, validation and testing
 train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, train_transform)
 val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, val_transform)
-test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, test_transform)
+
 
 print('Datasets created')
 
 #Create dataloader fot training, validation and testig
-train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
-test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
+train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
 print('Dataloaders created')
 
@@ -178,8 +177,6 @@ train_features, train_labels = get_features(train_dataloader)
 print('Train feaures created')
 val_features, val_labels = get_features(val_dataloader)
 print('Validation features created')
-test_features, test_labels = get_features(test_dataloader)
-print('Test features created')
 
 def visualize_features(features, labels, title):
     pca = PCA(n_components=2)
@@ -188,16 +185,10 @@ def visualize_features(features, labels, title):
     plt.scatter(reduced_features[:, 0], reduced_features[:, 1], c=labels, cmap='viridis', alpha=0.5)
     plt.colorbar()
     plt.title(title)
-    plt.savefig('clip_features_linear_30e_5p_best_model.png')
+    plt.savefig('clip_features_decay_fs.png')
     plt.close()
 
-#visualize_features(test_features, test_labels, 'Test Features')
-
 classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
-
-# Optionally, use early stopping based on the validation set performance
-# For example, if validation accuracy does not improve for several epochs, stop training
-
 
 # Training
 print('Training')
@@ -230,6 +221,12 @@ print(f"Validation F1 Score = {val_f1:.3f}")
 
     
 start_time = datetime.now()
+
+test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, test_transform)
+test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+test_features, test_labels = get_features(test_dataloader)
+print('Test features created')
+
 # Evaluate the trained classifier on the test set
 test_predictions = classifier.predict(test_features)
 
@@ -238,22 +235,26 @@ test_precision = precision_score(test_labels, test_predictions)
 test_recall = recall_score(test_labels, test_predictions)
 test_f1 = f1_score(test_labels, test_predictions)
 
+print(f"Test Accuracy = {test_accuracy:.3f}")
+print(f"Test Precision = {test_precision:.3f}")
+print(f"Test Recall = {test_recall:.3f}")
+print(f"Test F1 Score = {test_f1:.3f}")
+
 end_time = datetime.now()
 print('Start time: ', start_time)
 print('Ending time: ', end_time)
 print('Overall time: ', end_time-start_time)
 
-print(f"Test Accuracy = {test_accuracy:.3f}")
-print(f"Test Precision = {test_precision:.3f}")
-print(f"Test Recall = {test_recall:.3f}")
-print(f"Test F1 Score = {test_f1:.3f}")
+visualize_features(test_features, test_labels, 'Test Features')
 
 conf_matrix = confusion_matrix(test_labels, test_predictions)
 print("Confusion Matrix:")
 print(conf_matrix)
 
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
+num_parameters = classifier.coef_.size
+print(f"Logistic Regression model parameters: {num_parameters}")
 
 #save model
-filename = '../final_logreg_model_lin_best_s2.sav'
-joblib.dump(classifier, filename)
+filename = '../final_logreg_model_reducelr_lin_best_s3.sav'
+#joblib.dump(classifier, filename)
