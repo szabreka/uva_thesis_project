@@ -67,3 +67,20 @@ promising approach for smoke detection.
 | 4-3 | Train | Train | Train | Test | Train |
 | 5-0 | Train | Validate | Train | Train | Test |
 | 5-1 | Train | Test | Train | Validate | Train |
+
+ ### How to use code?
+
+1. **Fork repository**
+
+2. **Set up virtual environment**:
+    ```bash
+    conda create -n deep-smoke-machine
+    conda activate deep-smoke-machine
+    conda install python=3.9.19
+    conda install pip
+    pip install -r requirements.txt
+
+3. **Run code**
+
+
+Note that the baseline model used in the thesis report is available at: https://github.com/szabreka/thesis-deep-smoke-machine-rsz
