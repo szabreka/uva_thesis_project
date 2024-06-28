@@ -26,13 +26,13 @@ import joblib
 # Define device
 if torch.cuda.is_available():
     device = torch.device("cuda") # use CUDA device
-#elif torch.backends.mps.is_available():
-#    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
+elif torch.backends.mps.is_available():
+    device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
 else:
     device = torch.device("cpu") # use CPU device
 print('Used device: ', device)
 
-#Load CLIP model - ViT B32
+#Load CLIP model
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
 #Load saved model weights
@@ -102,22 +102,23 @@ class ImageTitleDataset(Dataset):
         return image, true_label
     
 #Define training, validation and test data
-#Define training, validation and test data
 def load_data(split_path):
     with open(split_path, 'r') as f:
         data = json.load(f)
     return pd.DataFrame(data)
 
+#Date split
 train_data = load_data('data/split/metadata_train_split_by_date.json')
 val_data = load_data('data/split/metadata_validation_split_by_date.json')
 test_data = load_data('data/split/metadata_test_split_by_date.json')
 
+#View splits
 '''train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
 val_data = load_data('data/split/metadata_validation_split_4_by_camera.json')
 test_data = load_data('data/split/metadata_test_split_4_by_camera.json')'''
 
 
-# Prepare the list of video file paths and labels
+#Prepare the list of video file paths and labels
 train_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in train_data['file_name']]
 train_list_labels = [int(label) for label in train_data['label']]
 val_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in val_data['file_name']]
@@ -125,10 +126,10 @@ val_list_labels = [int(label) for label in val_data['label']]
 test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
 test_list_labels = [int(label) for label in test_data['label']]
 
-# Define input resolution
+#Define input resolution
 input_resolution = (224, 224)
 
-# Define the transformation pipeline - from CLIP preprocessor without random crop augmentation
+#Define the transformation pipeline - from CLIP preprocessor without random crop augmentation
 train_transform = transforms.Compose([
     transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
     transforms.ToTensor(),
@@ -147,15 +148,14 @@ test_transform = transforms.Compose([
     transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711])
 ])
 
-# Create dataset and data loader for training, validation and testing
+#Create dataset and data loader for training, validation and testing
 train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, train_transform)
 val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, val_transform)
 test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, test_transform)
 
 print('Datasets created')
 
-#Create dataloader fot training, validation and testig
-
+#Create dataloader fot training, validation and testing
 train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
@@ -184,7 +184,7 @@ print('Validation features created')
 test_features, test_labels = get_features(test_dataloader, 'Test')
 print('Test features created')
 
-#Function to visualize features in 2d space
+#Function to visualize features in 2D space
 def visualize_features(features, labels, title):
     pca = PCA(n_components=2)
     reduced_features = pca.fit_transform(features)
@@ -203,19 +203,19 @@ param_grid = {
     'C': np.logspace(-3, 3, 100)
 }
 
+#define classifier
 classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
 
+#define and fit grid search
 grid_search = GridSearchCV(estimator=classifier, param_grid=param_grid, scoring = 'accuracy', cv=5, verbose=1, n_jobs=-1)
+grid_search.fit(val_features, val_labels)
 
-grid_search.fit(train_features, train_labels)
-
+#get the best classifier
 best_classifier = grid_search.best_estimator_
-
 print(f"Best C: {grid_search.best_params_['C']}, Best penalty: {grid_search.best_params_['penalty']}")
 
 # Validation
 print('Validation')
-#val_predictions = classifier.predict(val_features)
 val_predictions = best_classifier.predict(val_features)
 
 val_accuracy = accuracy_score(val_labels, val_predictions)
@@ -228,9 +228,10 @@ print(f"Validation Precision = {val_precision:.3f}")
 print(f"Validation Recall = {val_recall:.3f}")
 print(f"Validation F1 Score = {val_f1:.3f}")
 
+#Capture start time of testing
 start_time = datetime.now()
-# Evaluate the trained classifier on the test set
-#test_predictions = classifier.predict(test_features)
+
+#Evaluate the trained classifier on the test set
 test_predictions = best_classifier.predict(test_features)
 
 test_accuracy = accuracy_score(test_labels, test_predictions)
@@ -252,12 +253,12 @@ conf_matrix = confusion_matrix(test_labels, test_predictions)
 print("Confusion Matrix:")
 print(conf_matrix)
 
-# Classification report
+#Classification report
 target_names = ['class 0', 'class 1']
 print(classification_report(test_labels, test_predictions, target_names=target_names))
 
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
 
-#save model
+#Save model
 filename = '../final_logreg_model_reducelr_grid_best_s3.sav'
 joblib.dump(best_classifier, filename)

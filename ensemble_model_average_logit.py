@@ -37,6 +37,7 @@ else:
     device = torch.device("cpu")
 print('Used device: ', device)
 
+#define cnn-rnn model
 class MobileNetV3Small_RNN(nn.Module):
     def __init__(self, num_classes, rnn_type="LSTM"):
         super(MobileNetV3Small_RNN, self).__init__()
@@ -71,28 +72,24 @@ class MobileNetV3Small_RNN(nn.Module):
 
     def forward(self, x):
         batch_size, timesteps, C, H, W = x.size()
-
-        #accepts PIL.Image, batched (B, C, H, W) and single (C, H, W) image torch.Tensor objects. 
-        #reshape input for feature extraction - mobilenet can only take images (4 d)
         c_in = x.view(batch_size * timesteps, C, H, W)
         
         #extract features with mobilenet
         features = self.feature_extractor(c_in)
         
-        #pooling - using the same one as in the mobilenet architecture
-        #lstm layer needs a 3D tensor, with shape (batch, timesteps, feature)
+        #pooling
         features = self.pool(features).view(batch_size, timesteps, -1)
 
         #get rnn output by passing the features to the selected rnn
         rnn_out, _ = self.rnn(features)
         
-        #batch, timesteps, output features
         #only select the last of the timesteps as it holds the information of the whole video
         last_output = rnn_out[:, -1, :]
         logits = self.fc(last_output)
         
         return logits
-    
+
+#load rnn model    
 rnn_model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
 state_dict = torch.load('../cnn_splits/light_cnn_best_model_gru_s5.pt', map_location=device)
 state_dict = {k.partition('module.')[2] if k.startswith('module.') else k: v for k, v in state_dict.items()}
@@ -100,12 +97,13 @@ rnn_model.load_state_dict(state_dict)
 rnn_model = rnn_model.to(device)
 rnn_model.eval()
 
-
+#load clip
 clip_model, preprocess = clip.load('ViT-B/16', device, jit=False)
 state_dict = torch.load('../clip_splits/fs_best_model_s5_cosine.pt', map_location=device)
 clip_model.load_state_dict(state_dict)
 clip_model.eval()
 
+#load logreg layer of CLIP-LIN
 #logreg_model = joblib.load('../uva_thesis_project/final_logreg_model_best_61r.sav')
 
 class ImageTitleDataset(Dataset):
@@ -143,15 +141,17 @@ class ImageTitleDataset(Dataset):
         if len(frames) != 36:
             print("Num of frames are not 36")
             print("Num of frames for video on ", video_path, "is ", len(frames))
-
-        rows_list = []
-        for i in range(num_rows):
-            #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
-            row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
-            rows_list.append(row)
-        
-        # Concatenate grid vertically to create a single square-shaped image from the smoke video
-        concatenated_frames = np.concatenate(rows_list, axis=0)
+            concatenated_frames = np.concatenate(frames, axis=1)
+        else:
+            #Create  and store rows in the grids
+            rows_list = []
+            for i in range(num_rows):
+                #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
+                row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
+                rows_list.append(row)
+            
+            #Concatenate grid vertically to create a single square-shaped image from the smoke video
+            concatenated_frames = np.concatenate(rows_list, axis=0)
         
         return frames, concatenated_frames
     
@@ -182,35 +182,18 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
+#date split
 '''test_data = load_data('data/split/metadata_test_split_by_date.json')'''
 
+#view split
 test_data = load_data('data/split/metadata_test_split_4_by_camera.json')
-
-# Define input resolution
-input_resolution = (256, 256)
-
-val_test_transform = transforms.Compose([
-    transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
 
 # Prepare the list of video file paths and labels
 test_list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
 test_list_labels = [int(label) for label in test_data['label']]
 
-# Define input resolution
+#Define input resolution for cnn-rnn
 rnn_input_resolution = (256, 256)
-
-# Define the transformation pipeline - from CLIP preprocessor without random crop augmentation, with extra data augmentation steps from RISE
-rnn_train_transform = transforms.Compose([
-    transforms.Resize(rnn_input_resolution, interpolation=Image.BICUBIC),
-    transforms.RandomHorizontalFlip(p=0.3),
-    transforms.RandomPerspective(distortion_scale=0.3, p=0.3),
-    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
 
 rnn_val_test_transform = transforms.Compose([
     transforms.Resize(rnn_input_resolution, interpolation=Image.BICUBIC),
@@ -218,20 +201,10 @@ rnn_val_test_transform = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-#Define class names in a list - it needs prompt engineering
-#class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
-#class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
-#class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emiting smoke from chimney"] #- 3
-#class_names = ["a photo of a factory with no smoke", "a photo of a factory with smoke emission"] #- 4
+#Define class names in a list
 class_names = ["a series picture of a factory with clear sky above chimney", "a series picture of a smoking factory"] #- 5
-#class_names = ["a series picture of a factory with no smoke", "a series picture of a smoking factory"] #- 6
-#class_names = ["a sequental photo of an industrial plant with clear sky above chimney, created from a video", "a sequental photo of an industrial plant emiting smoke from chimney, created from a video"]# - 7
-#class_names = ["a photo of a shut down chimney", "a photo of smoke chimney"] #-8
-#class_names = ["The industrial plant appears to be in a dormant state, with no smoke or emissions coming from its chimney. The air around the facility is clear and clean.","The smokestack of the factory is emitting dark or gray smoke against the sky. The emissions may be a result of industrial activities within the facility."] #-9
-#class_names = ["a photo of an industrial site with no visible signs of pollution", "a photo of a smokestack emitting smoke against the sky"] #-10
-#class_names = ['no smoke', 'smoke'] #-11
 
-# Define input resolution
+# Define input resolution for clip
 input_resolution = (224, 224)
 
 # Define the transformation pipeline - from CLIP preprocessor without random crop augmentation
@@ -243,12 +216,12 @@ clip_transform_steps = transforms.Compose([
 
 # Create dataset and data loader for training, validation and testing
 test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, rnn_val_test_transform, clip_transform_steps)
-
 print('Dataset created')
 
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 print('Dataloader created')
 
+#convert model to fp32 format (for clip)
 def convert_models_to_fp32(model): 
     for p in model.parameters(): 
         p.data = p.data.float() 
@@ -278,14 +251,14 @@ class CLIP_MobileNetV3_RNN_Ensemble(nn.Module):
         text_inputs = clip.tokenize(classname,context_length=77, truncate=True).to(device)
         print('images', images.shape)
         print('text', text_inputs.shape)
-        #text_inputs.squeeze(dim=1)
         logits_per_image, logits_per_text = self.clip_model(images, text_inputs)
 
         #get mobilenet-rnn logits
         rnn_logits = self.mobilenet_rnn_model(frames)
 
-        #combine the logits
+        #combine the logits (with weights)
         combined_logits = ( w_clip * logits_per_image + w_cnn * rnn_logits)/2
+        #multiplication
         #combined_logits = ( w_clip * logits_per_image * w_cnn * rnn_logits)
 
         return combined_logits
@@ -318,14 +291,17 @@ class CLIP_GLIN_MobileNetV3_RNN_Ensemble(nn.Module):
         #get mobilenet-rnn logits
         rnn_logits = self.mobilenet_rnn_model(frames)
 
-        #combine logits
+        #combine logits (with weights)
         combined_logits = ( w_clip * clip_glin_pred + w_cnn * rnn_logits)/2
 
         return combined_logits
 
+#ensemble with CLIP-FS
 ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
+#ensemble with CLIP-LIN
 #ensemble_model = CLIP_GLIN_MobileNetV3_RNN_Ensemble(clip_model, rnn_model, logreg_model)
 
+#evaluate ensemble model
 def evaluate_model(model, dataloader, device):
     model.eval()
     all_preds = []
@@ -354,20 +330,18 @@ print(f"Test Precision: {precision:.4f}")
 print(f"Test Recall: {recall:.4f}")
 print(f"Test F1 Score: {f1:.4f}")
 
+#get infernece time
 end_time = datetime.now()
 print('Start time: ', start_time)
 print('Ending time: ', end_time)
 print('Overall time: ', end_time-start_time)
 
+#Get parameters
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters())
 
-# Count parameters of the RNN model
+#Count parameters of the RNN model
 print("Number of trainable parameters in RNN model: ", count_parameters(rnn_model))
 
-# Count parameters of the CLIP model
+#Count parameters of the CLIP model
 print("Number of trainable parameters in CLIP model: ", count_parameters(clip_model))
-
-# Count parameters of the ensemble model
-ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
-print("Number of trainable parameters in ensemble model: ", count_parameters(ensemble_model))

@@ -72,9 +72,9 @@ class MobileNetV3Small_RNN(nn.Module):
         self.fc = nn.Linear(256, num_classes)
 
     def forward(self, x):
+        #accepts PIL.Image, batched (B, C, H, W) and single (C, H, W) image torch.Tensor objects
         batch_size, timesteps, C, H, W = x.size()
 
-        #accepts PIL.Image, batched (B, C, H, W) and single (C, H, W) image torch.Tensor objects. 
         #reshape input for feature extraction - mobilenet can only take images (4 d)
         c_in = x.view(batch_size * timesteps, C, H, W)
         
@@ -88,25 +88,27 @@ class MobileNetV3Small_RNN(nn.Module):
         #get rnn output by passing the features to the selected rnn
         rnn_out, _ = self.rnn(features)
         
-        #dropout layer
+        #dropout layer - not used for models in paper
         #rnn_out = self.dropout(rnn_out)
 
         #batch, timesteps, output features
-        #only select the last of the timesteps as it holds the information of the whole video
+        #to only select the last of the timesteps as it holds the information of the whole video
         last_output = rnn_out[:, -1, :]
         logits = self.fc(last_output)
         
         return logits
 
 
+#define CNN-RNN model
 model = MobileNetV3Small_RNN(num_classes=2, rnn_type="GRU")
 model = model.to(device)
 
+#use dataparallelism
 if torch.cuda.device_count() > 1:
     print("Let's use", torch.cuda.device_count(), "GPUs!")
     model = DataParallel(model)
 
-# Load the dataset
+#Load the dataset
 class ImageTitleDataset(Dataset):
     def __init__(self, list_video_path, list_labels, transform_image):
         #to handle the parent class
@@ -120,7 +122,6 @@ class ImageTitleDataset(Dataset):
 
     @staticmethod
     #Function to create a square-shaped image from the video (similar to 1 long image)
-
     def preprocess_video_to_a_set_of_images(video_path):
         #Open the video file
         video = cv2.VideoCapture(video_path)
@@ -137,10 +138,6 @@ class ImageTitleDataset(Dataset):
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 frames.append(frame_rgb)
             video.release()
-        
-        if len(frames) != 36:
-            print("Num of frames are not 36")
-            print("Num of frames for video on ", video_path, "is ", len(frames))
         
         return frames
 
@@ -165,15 +162,16 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
+#Date split
 train_data = load_data('data/split/metadata_train_split_by_date.json')
 val_data = load_data('data/split/metadata_validation_split_by_date.json')
 test_data = load_data('data/split/metadata_test_split_by_date.json')
 
+#View splits
 '''train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
 val_data = load_data('data/split/metadata_validation_split_4_by_camera.json')
 test_data = load_data('data/split/metadata_test_split_4_by_camera.json')'''
 
-# Prepare the list of video file paths and labels
 #Prepare the list of video file paths and labels
 def prepare_paths_labels(data, base_path):
     list_video_path = [os.path.join(base_path, f"{fn}.mp4") for fn in data['file_name']]
@@ -185,10 +183,10 @@ train_list_video_path, train_list_labels = prepare_paths_labels(train_data, base
 val_list_video_path, val_list_labels = prepare_paths_labels(val_data, base_path)
 test_list_video_path, test_list_labels = prepare_paths_labels(test_data, base_path)
 
-# Define input resolution
+#Define input resolution
 input_resolution = (256, 256)
 
-# Define the transformation pipeline - from CLIP preprocessor without random crop augmentation, with extra data augmentation steps from RISE
+#Define the transformation pipeline - from CLIP preprocessor without random crop augmentation, with extra data augmentation steps from RISE
 train_transform = transforms.Compose([
     transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
     transforms.RandomHorizontalFlip(p=0.3),
@@ -208,32 +206,18 @@ val_test_transform = transforms.Compose([
 train_dataset = ImageTitleDataset(train_list_video_path, train_list_labels, train_transform)
 val_dataset = ImageTitleDataset(val_list_video_path, val_list_labels, val_test_transform)
 test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, val_test_transform)
-
 print('Datasets created')
 
 train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True)
 val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
-
 print('Dataloaders created')
 
 num_epochs = 50
-#optimizer: first trainings:
-#optimizer = torch.optim.Adam(model.parameters(), lr=5e-4,betas=(0.9,0.98),eps=1e-6,weight_decay=1e-6)
-#optimizer: second trainings:
-#optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
-#optimizer: third trainings:
-#optimizer = torch.optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-4)
 optimizer = torch.optim.Adam(model.parameters(), lr=5e-4, betas=(0.9,0.98),eps=1e-6,weight_decay=1e-6)
 loss = nn.CrossEntropyLoss()
-#second_option_scheduler:
-#scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
-#third_option_scheduler:
+#lr scheduler for LSTM
 #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
-#4. option:
-#scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
-#scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
-
 
 best_te_loss = 1e5
 best_ep = -1
@@ -244,6 +228,7 @@ val_accuracies = []
 train_losses = []
 val_losses = []
 
+#Training
 for epoch in range(num_epochs):
     print(f"running epoch {epoch}, best test loss {best_te_loss} after epoch {best_ep}")
     step = 0
@@ -255,10 +240,10 @@ for epoch in range(num_epochs):
     for batch in pbar:
         step += 1
 
-        # Extract images and labels from the batch
+        #Extract images and labels from the batch
         images, labels = batch 
 
-        # Move images and texts to the specified device (CPU or GPU)
+        #Move images and texts to the specified device (CPU or GPU)
         images= images.to(device)
         labels = labels.to(device)
 
@@ -266,7 +251,7 @@ for epoch in range(num_epochs):
         batch_loss = loss(predictions, labels)
         tr_loss += batch_loss.item()
 
-        # Calculate accuracy
+        #Calculate accuracy
         probabilities = torch.argmax(predictions, dim=1)
 
         correct = (probabilities == labels).sum().item()
@@ -277,7 +262,6 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         batch_loss.backward()
         optimizer.step()
-        #scheduler.step()
         pbar.set_description(f"Epoch {epoch}/{num_epochs}, Loss: {batch_loss.item():.4f}, Current Learning rate: {optimizer.param_groups[0]['lr']}")
     tr_loss /= step
     train_accuracy = epoch_train_correct / epoch_train_total
@@ -312,11 +296,11 @@ for epoch in range(num_epochs):
             epoch_val_correct += correct
             epoch_val_total += total
 
-            # Append predicted labels and ground truth labels
+            #Append predicted labels and ground truth labels
             all_preds.extend(pred_labels.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
-            # Update the progress bar with the current epoch and loss
+            #Update the progress bar with the current epoch and loss
             vbar.set_description(f"Validation: {i}/{len(val_dataloader)}, Validation loss: {val_loss.item():.4f}")
             i+=1
 
@@ -327,18 +311,15 @@ for epoch in range(num_epochs):
     val_accuracies.append(val_accuracy)
     train_losses.append(te_loss)
     
-    #scheduler
-    #scheduler.step(te_loss) #- m
+    #scheduler for LSTM
+    #scheduler.step(te_loss)
 
-    # Calculate confusion matrix
+    #Calculate confusion matrix
     conf_matrix = confusion_matrix(all_labels, all_preds)
-
-    # Print or visualize the confusion matrix
     print("Confusion Matrix:")
     print(conf_matrix)
 
-    #get evaluation metrics:
-
+    #Evaluation metrics:
     precision = precision_score(all_labels, all_preds, average='binary')
     recall = recall_score(all_labels, all_preds, average='binary')
     f_score= f1_score(all_labels, all_preds, average='binary')
@@ -396,15 +377,12 @@ with torch.no_grad():
     print('Ending time: ', end_time)
     print('Overall time: ', end_time-start_time)
 
-# Calculate confusion matrix
+#Calculate confusion matrix
 conf_matrix = confusion_matrix(test_labels, test_preds)
-
-# Print or visualize the confusion matrix
 print("Confusion Matrix:")
 print(conf_matrix)
 
-#get evaluation metrics:
-
+#Evaluation
 precision = precision_score(test_labels, test_preds, average='binary')
 recall = recall_score(test_labels, test_preds, average='binary')
 f_score= f1_score(test_labels, test_preds, average='binary')
@@ -422,7 +400,7 @@ print("Model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.param
 target_names = ['class 0', 'class 1']
 print(classification_report(test_labels, test_preds, target_names=target_names))
 
-# Plot the training and validation accuracy
+#Plot the training and validation accuracy
 plt.figure(figsize=(10, 5))
 plt.plot(train_accuracies, label='Training Accuracy')
 plt.plot(val_accuracies, label='Validation Accuracy')
@@ -433,7 +411,7 @@ plt.title('Training and Validation Accuracy')
 plt.savefig('training_validation_accuracy_cnn_reducelr.png')
 plt.close()
 
-# Plot the training and validation loss
+#Plot the training and validation loss
 plt.figure(figsize=(10, 5))
 plt.plot(train_losses, label='Training Loss')
 plt.plot(val_losses, label='Validation Loss')

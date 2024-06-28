@@ -31,11 +31,9 @@ elif torch.backends.mps.is_available():
     device = torch.device("mps") # use MacOS GPU device (e.g., for M2 chips)
 else:
     device = torch.device("cpu") # use CPU device
-
-#device = torch.device("cpu") # use CPU device
 print(device)
 
-#Load CLIP model - ViT B32
+#Load CLIP model
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
 # Load the dataset
@@ -50,12 +48,10 @@ class ImageTitleDataset(Dataset):
         #Initialize class names (no smoke or smoke)
         self.class_names = class_names
         #Transform to tensor
-        #self.transforms = ToTensor()
         self.transform_image = transform_image
 
     @staticmethod
-    #Function to create a square-shaped image from the video (similar to 1 long image)
-    #To do: what if the video has more frames than 36?
+    #Function to create a square-shaped image from the video
     def preprocess_video_to_image_grid_version(video_path, num_rows=6, num_cols=6):
         #Open the video file
         video = cv2.VideoCapture(video_path)
@@ -73,19 +69,22 @@ class ImageTitleDataset(Dataset):
                 frames.append(frame_rgb)
             video.release()
         
+        #If the video has a different amount of frames from 36, then produce a long image
         if len(frames) != 36:
             print("Num of frames are not 36")
             print("Num of frames for video on ", video_path, "is ", len(frames))
-        
-        # Create  and store rows in the grids
-        rows_list = []
-        for i in range(num_rows):
-            #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
-            row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
-            rows_list.append(row)
-        
-        # Concatenate grid vertically to create a single square-shaped image from the smoke video
-        concatenated_frames = np.concatenate(rows_list, axis=0)
+            concatenated_frames = np.concatenate(frames, axis=1)
+        else:
+            #Create  and store rows in the grids
+            rows_list = []
+            for i in range(num_rows):
+                #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
+                row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
+                rows_list.append(row)
+            
+            #Concatenate grid vertically to create a single square-shaped image from the smoke video
+            concatenated_frames = np.concatenate(rows_list, axis=0)
+
         return concatenated_frames
 
     def __len__(self):
@@ -103,21 +102,21 @@ class ImageTitleDataset(Dataset):
         label = clip.tokenize(label, context_length=77, truncate=True)
         return image, label, true_label
     
-#Define training data
+#Define test data
 with open('data/split/metadata_test_split_by_date.json', 'r') as f:
     test_data = json.load(f)
 
-# Convert the dataset to a Pandas DataFrame
+#Convert the dataset to a Pandas DataFrame
 test_data = pd.DataFrame(test_data)
 
-# Prepare the list of video file paths and labels
+#Prepare the list of video file paths and labels
 list_video_path = [os.path.join("/../projects/0/prjs0930/data/merged_videos/", f"{fn}.mp4") for fn in test_data['file_name']]
 
 #list_labels = dataset['label'].tolist()
 list_labels = [int(label) for label in test_data['label']]
 
 
-#Define class names in a list - it needs prompt engineering
+#Define class names in a list
 #class_names = ["a photo of a factory with no smoke", "a photo of a smoking factory"] #1
 #class_names = ["a series picture of a factory with a shut down chimney", "a series picture of a smoking factory chimney"] #- 2
 #class_names = ["a photo of factories with clear sky above chimney", "a photo of factories emitting smoke from chimney"] #- 3
@@ -131,19 +130,20 @@ class_names = ["a series picture of a factory with clear sky above chimney", "a 
 #class_names = ['no smoke', 'smoke'] #11
 #class_names = ['a photo of an industrial facility, emitting no smoke', 'a photo of an industrial facility, emitting smoke'] #12
 
-# Define input resolution
+#Define input resolution
 input_resolution = (224, 224)
 
-# Define the transformation pipeline - from CLIP preprocessor without random crop augmentation
+#Define the transformation pipeline - from CLIP preprocessor without random crop augmentation
 transform = transforms.Compose([
     transforms.Resize(input_resolution, interpolation=Image.BICUBIC),
     transforms.ToTensor(),
     transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711])
 ])
 
-# Create dataset for testing
+#Create dataset for testing
 dataset = ImageTitleDataset(list_video_path, list_labels, class_names, transform)
 
+#Function for testing
 def zs_clip(dataset):
     predicted_labels= []
     ground_truths = []
@@ -154,10 +154,7 @@ def zs_clip(dataset):
 
         # Move images and texts to the specified device
         images = images.unsqueeze(0).to(device)
-        texts = labels.to(device)
-        #true_label = true_label.to(device)
         text_inputs = clip.tokenize(class_names).to(device)
-        texts = texts.squeeze(dim=1)
         text_inputs.squeeze(dim=1)
 
         # Calculate features
@@ -169,7 +166,6 @@ def zs_clip(dataset):
         image_features /= image_features.norm(dim=-1, keepdim=True)
         text_features /= text_features.norm(dim=-1, keepdim=True)
         similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
-        #print(similarity)
 
         #It's the same as the similarity:
         #logits_per_image, logits_per_text = model(images, text_inputs)
@@ -179,30 +175,23 @@ def zs_clip(dataset):
         value, index = similarity[0].topk(1)
         ground_truth = torch.tensor(true_label, dtype=torch.long, device=device)
 
-        # Convert similarity scores to predicted labels
+        #Convert similarity scores to predicted labels
         predicted_label = index.cpu().numpy()
         ground_truth_label = ground_truth.cpu().numpy()
 
         predicted_labels.append(predicted_label)
         ground_truths.append(ground_truth_label)
     
-    # Compute accuracy
+    #Evaulate
     accuracy = accuracy_score(ground_truths, predicted_labels)
-
-    # Compute precision
     precision = precision_score(ground_truths, predicted_labels, average='binary')
-
-    # Compute recall
     recall = recall_score(ground_truths, predicted_labels, average='binary')
-
-    # Compute F1 score
     f1 = f1_score(ground_truths, predicted_labels, average='binary')
 
-    # Classification report
+    #Classification report
     target_names = ['class 0', 'class 1']
     print(classification_report(ground_truths, predicted_labels, target_names=target_names))
     
-    # Print or log the metrics
     print(f"Accuracy: {accuracy:.4f}")
     print(f"Precision: {precision:.4f}")
     print(f"Recall: {recall:.4f}")
@@ -210,22 +199,22 @@ def zs_clip(dataset):
 
 zs_clip(dataset)
 
+#Get inference time
 end_time = datetime.now()
 print('Start time: ', start_time)
 print('Ending time: ', end_time)
 print('Overall time: ', end_time-start_time)
 
 #Visualize some results
-
 def visualize_random_images(dataset, num_images=9):
-    # Select random indices
+    #Select random indices
     random_indices = random.sample(range(len(dataset)), num_images)
     
-    # Prepare plot
+    #Prepare plot
     fig, axes = plt.subplots(3, 3, figsize=(20, 14))
     axes = axes.flatten()
     
-    # Prepare CLIP model and text inputs
+    #Prepare CLIP model and text inputs
     model.eval()
     text_inputs = clip.tokenize(class_names).to(device)
     
@@ -263,7 +252,7 @@ def visualize_random_images(dataset, num_images=9):
     plt.savefig('zeroshot_examples.png')
     plt.close()
 
-# Visualize random 9 images
+#Visualize random 9 images
 #visualize_random_images(dataset)
 
 #Get image features 

@@ -29,7 +29,7 @@ import joblib
 
 start_time = datetime.now()
 
-# Define device
+#Define device
 if torch.cuda.is_available():
     device = torch.device("cuda") # use CUDA device
 elif torch.backends.mps.is_available():
@@ -144,15 +144,17 @@ class ImageTitleDataset(Dataset):
         if len(frames) != 36:
             print("Num of frames are not 36")
             print("Num of frames for video on ", video_path, "is ", len(frames))
-
-        rows_list = []
-        for i in range(num_rows):
-            #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
-            row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
-            rows_list.append(row)
-        
-        # Concatenate grid vertically to create a single square-shaped image from the smoke video
-        concatenated_frames = np.concatenate(rows_list, axis=0)
+            concatenated_frames = np.concatenate(frames, axis=1)
+        else:
+            #Create  and store rows in the grids
+            rows_list = []
+            for i in range(num_rows):
+                #create rows from the frames using indexes -- for example, if i=0, then between the 0th and 6th frame
+                row = np.concatenate(frames[i * num_cols: (i + 1) * num_cols], axis=1)
+                rows_list.append(row)
+            
+            #Concatenate grid vertically to create a single square-shaped image from the smoke video
+            concatenated_frames = np.concatenate(rows_list, axis=0)
         
         return frames, concatenated_frames
     
@@ -321,6 +323,7 @@ test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, rnn_val
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 
+#get features
 def get_features(model, dataloader):
     model.eval()
     all_features = []
@@ -335,11 +338,10 @@ def get_features(model, dataloader):
     
     return all_features, all_labels
 
-
+#load meta model for stacking
 meta_model = joblib.load('../logreg_model_ensemble_stacking_lstm_s3.sav')
 
-
-
+#evaluate model
 def evaluate_model(model, dataloader, device):
     model.eval()
     all_preds = []
@@ -367,7 +369,7 @@ print(f"Test Precision: {precision:.4f}")
 print(f"Test Recall: {recall:.4f}")
 print(f"Test F1 Score: {f1:.4f}")
 
-
+#Get inference time
 end_time = datetime.now()
 print('Start time: ', start_time)
 print('Ending time: ', end_time)
@@ -376,15 +378,15 @@ print('Overall time: ', end_time-start_time)
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters())
 
-# Count parameters of the RNN model
+#Count parameters of the RNN model
 print("Number of trainable parameters in RNN model: ", count_parameters(rnn_model))
 
-# Count parameters of the CLIP model
+#Count parameters of the CLIP model
 print("Number of trainable parameters in CLIP model: ", count_parameters(clip_model))
 
-# Count parameters of the CLIP model
+#Count parameters of the CLIP model
 print("Number of trainable parameters in Logreg model: ", meta_model.coef_.size)
 
-# Count parameters of the ensemble model
+#Count parameters of the ensemble model
 ensemble_model = CLIP_MobileNetV3_RNN_Ensemble(clip_model, rnn_model)
 print("Number of trainable parameters in ensemble model: ", count_parameters(ensemble_model))

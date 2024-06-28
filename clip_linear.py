@@ -31,7 +31,7 @@ else:
     device = torch.device("cpu") # use CPU device
 print('Used device: ', device)
 
-#Load CLIP model - ViT B32
+#Load CLIP model
 model, preprocess = clip.load('ViT-B/16', device, jit=False)
 
 state_dict = torch.load('../clip_splits/fs_last_model_decay_s3.pt', map_location=device)
@@ -47,7 +47,6 @@ class ImageTitleDataset(Dataset):
         #Initialize labels (0 or 1)
         self.labels = list_labels
         #Transform to tensor
-        #self.transforms = ToTensor()
         self.transform_image = transform_image
 
     @staticmethod
@@ -107,10 +106,12 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
+#Date split
 train_data = load_data('data/split/metadata_train_split_by_date.json')
 val_data = load_data('data/split/metadata_validation_split_by_date.json')
 test_data = load_data('data/split/metadata_test_split_by_date.json')
 
+#View splits
 '''train_data = load_data('data/split/metadata_train_split_4_by_camera.json')
 val_data = load_data('data/split/metadata_validation_split_4_by_camera.json')
 test_data = load_data('data/split/metadata_test_split_4_by_camera.json')'''
@@ -188,10 +189,11 @@ def visualize_features(features, labels, title):
     plt.savefig('clip_features_decay_fs.png')
     plt.close()
 
+#define classifier
 classifier = LogisticRegression(random_state=0, C=0.316, max_iter=1000, verbose=1)
 
 # Training
-print('Training')
+print('Start training')
 classifier.fit(train_features, train_labels)
 
 train_predictions = classifier.predict(train_features)
@@ -206,7 +208,7 @@ print(f"Train Recall = {train_recall:.3f}")
 print(f"Train F1 Score = {train_f1:.3f}")
 
 # Validation
-print('Validation')
+print('Start validation')
 val_predictions = classifier.predict(val_features)
 
 val_accuracy = accuracy_score(val_labels, val_predictions)
@@ -222,12 +224,13 @@ print(f"Validation F1 Score = {val_f1:.3f}")
     
 start_time = datetime.now()
 
+#Create test features
 test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, test_transform)
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 test_features, test_labels = get_features(test_dataloader)
 print('Test features created')
 
-# Evaluate the trained classifier on the test set
+#Evaluate the trained classifier on the test set
 test_predictions = classifier.predict(test_features)
 
 test_accuracy = accuracy_score(test_labels, test_predictions)
@@ -240,21 +243,25 @@ print(f"Test Precision = {test_precision:.3f}")
 print(f"Test Recall = {test_recall:.3f}")
 print(f"Test F1 Score = {test_f1:.3f}")
 
+#Get test time
 end_time = datetime.now()
 print('Start time: ', start_time)
 print('Ending time: ', end_time)
 print('Overall time: ', end_time-start_time)
 
+#visualize features in 2D
 visualize_features(test_features, test_labels, 'Test Features')
 
+#confusion matrix
 conf_matrix = confusion_matrix(test_labels, test_predictions)
 print("Confusion Matrix:")
 print(conf_matrix)
 
+#get number of parameters
 print("CLIP model parameters:", f"{np.sum([int(np.prod(p.shape)) for p in model.parameters()]):,}")
 num_parameters = classifier.coef_.size
 print(f"Logistic Regression model parameters: {num_parameters}")
 
 #save model
 filename = '../final_logreg_model_reducelr_lin_best_s3.sav'
-#joblib.dump(classifier, filename)
+joblib.dump(classifier, filename)

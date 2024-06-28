@@ -102,10 +102,12 @@ def load_data(split_path):
         data = json.load(f)
     return pd.DataFrame(data)
 
+#date split
 train_data = load_data('data/split/metadata_train_split_by_date.json')
 val_data = load_data('data/split/metadata_validation_split_by_date.json')
 test_data = load_data('data/split/metadata_test_split_by_date.json')
 
+#view splits
 '''train_data = load_data('data/split/metadata_train_split_3_by_camera.json')
 val_data = load_data('data/split/metadata_validation_split_3_by_camera.json')
 test_data = load_data('data/split/metadata_test_split_3_by_camera.json')'''
@@ -154,7 +156,6 @@ test_dataset = ImageTitleDataset(test_list_video_path, test_list_labels, transfo
 print('Datasets created')
 
 #Create dataloader fot training, validation and testig
-
 train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
@@ -174,12 +175,16 @@ if device == "cpu":
 #Define number of epochs
 num_epochs = 5
 
-# Prepare the optimizer - the lr, betas, eps and weight decay are from the CLIP paper
-#optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
+#Prepare the optimizer
+#CLIP-FS, CLIP-FS-rlr
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.2)
-#Different tried schedulers:
-#scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_dataloader)*num_epochs)
+#CLIP-FS-dec, CLIP-FS-cos
+#optimizer = torch.optim.Adam(model.parameters(), lr=1e-5,betas=(0.9,0.98),eps=1e-6,weight_decay=0.001)
+
+#LR schedulers:
+#CLIP-FS-cos
 #scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10)
+#CLIP-FS-rlr
 #scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)
 
 
@@ -235,7 +240,7 @@ for epoch in range(num_epochs):
     for batch in pbar:
         step += 1
 
-        #Extact images, class_names and labels from batch
+        #Extact images and labels from batch
         images, true_label = batch 
 
         #Move images and texts to the specified device (CPU or GPU)
@@ -307,7 +312,7 @@ for epoch in range(num_epochs):
         i = 0
         for batch in vbar:
                 step += 1
-                #Extract images, class names and labels from the batch
+                #Extract images and labels from the batch
                 images, true_label = batch 
                 #Move images and texts to the specified device
                 images = images.to(device)
@@ -397,22 +402,23 @@ for epoch in range(num_epochs):
     print(f"Validation Recall: {recall:.4f}")
     print(f"Validation F1 Score: {f_score:.4f}")
 
-    test_features, test_labels = get_features(test_dataloader)
-    print('Test features created')
-    visualize_features(test_features, test_labels, 'Test Features', epoch)
+    #visualize image features 
+    #test_features, test_labels = get_features(test_dataloader)
+    #print('Test features created')
+    #visualize_features(test_features, test_labels, 'Test Features', epoch)
 
     #save best model and set the value of early stopping counter based loss
     if te_loss < best_te_loss:
         best_te_loss = te_loss
         best_ep = epoch
-        #torch.save(model.state_dict(), "../fs_best_model_reducelr_s3.pt")
+        torch.save(model.state_dict(), "../fs_best_model.pt")
         early_stopping_counter = 0
     else:
         early_stopping_counter += 1
 
     #save last model
     print(f"epoch {epoch+1}, tr_loss {tr_loss}, te_loss {te_loss}")
-    #torch.save(model.state_dict(), "../fs_last_model_reducelr_s3.pt")
+    torch.save(model.state_dict(), "../fs_last_model.pt")
 
     if (early_stopping_counter >= early_stopping_patience) or (best_te_loss<=early_stopping_threshold):
         print(f"Early stopping after {epoch + 1} epochs.")
